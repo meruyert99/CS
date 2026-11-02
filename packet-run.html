@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Packet Run</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0}
+[hidden]{display:none!important}
+/* Layout: one column console — packet header HUD, hop track, task card. Colors borrowed from T568B cable pairs. */
+:root{
+  --bg:#EDF1F5; --surface:#FFFFFF; --sunk:#E3E9EF; --ink:#142230; --muted:#56687A; --line:#C7D1DC;
+  --orange:#C95A17; --blue:#2A63A8; --green:#2B8452; --brown:#7A5235; --bad:#C23B3B;
+  --orange-soft:#F7E3D5; --green-soft:#DCEFE3; --bad-soft:#F6DEDE; --blue-soft:#DCE7F4;
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1620; --surface:#16212D; --sunk:#111B25; --ink:#E4ECF3; --muted:#93A4B5; --line:#2A3A4A;
+  --orange:#F08A45; --blue:#7AAAE4; --green:#5CC18A; --brown:#C9996F; --bad:#F27373;
+  --orange-soft:#3A2618; --green-soft:#16301F; --bad-soft:#3A1C1C; --blue-soft:#18283C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1620; --surface:#16212D; --sunk:#111B25; --ink:#E4ECF3; --muted:#93A4B5; --line:#2A3A4A;
+  --orange:#F08A45; --blue:#7AAAE4; --green:#5CC18A; --brown:#C9996F; --bad:#F27373;
+  --orange-soft:#3A2618; --green-soft:#16301F; --bad-soft:#3A1C1C; --blue-soft:#18283C; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font:400 16px/1.5 var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 48px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:clamp(30px,6vw,48px);line-height:1.05}
+h2{font-size:clamp(20px,3.6vw,26px);line-height:1.2}
+p{margin:0}
+.mono{font-family:var(--f-mono)}
+.eyebrow{font:500 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+/* cable stripe signature */
+.cable{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--orange) 0 25%,var(--green) 25% 50%,var(--blue) 50% 75%,var(--brown) 75%)}
+
+/* HUD: packet header */
+.hdr{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.hdr-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));font-family:var(--f-mono);font-size:13px}
+.hdr-row>div{padding:8px 10px;border-right:1px solid var(--line);min-width:0}
+.hdr-row>div:last-child{border-right:0}
+.hdr-row b{display:block;font-weight:600;font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hdr-row span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.ttl b{color:var(--green)} .ttl.low b{color:var(--bad)}
+@media (max-width:620px){.hdr-row{grid-template-columns:repeat(3,minmax(0,1fr))}.hdr-row>div:nth-child(3){border-right:0}.hdr-row>div:nth-child(-n+3){border-bottom:1px solid var(--line)}}
+
+/* hop track */
+.track-wrap{overflow-x:auto;padding:6px 2px 4px;scrollbar-width:thin}
+.track{position:relative;display:flex;align-items:flex-start;min-width:760px;padding-top:4px}
+.track::before{content:"";position:absolute;left:20px;right:20px;top:21px;height:4px;background:var(--line);border-radius:2px}
+.track .fill{position:absolute;left:20px;top:21px;height:4px;background:var(--orange);border-radius:2px;transition:width .5s ease}
+.node{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;padding:0;min-width:0}
+.node i{width:34px;height:34px;border-radius:7px;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font:600 11px var(--f-mono);font-style:normal;color:var(--muted);z-index:1;transition:.3s}
+.node em{font:500 11px/1.2 var(--f-mono);font-style:normal;color:var(--muted);text-align:center;max-width:72px}
+.node.done i{border-color:var(--green);color:var(--green)}
+.node.part i{border-color:var(--orange);color:var(--orange)}
+.node.cur i{border-color:var(--orange);background:var(--orange);color:var(--surface)}
+.node.cur em{color:var(--ink);font-weight:600}
+.node.srv i{border-radius:50%}
+.pkt{position:absolute;top:0;width:18px;height:14px;border-radius:3px;background:var(--blue);z-index:2;transition:left .6s cubic-bezier(.6,.0,.3,1);box-shadow:0 0 0 3px var(--bg)}
+.pkt::after{content:"";position:absolute;left:3px;right:3px;top:4px;height:2px;background:var(--surface);opacity:.8;box-shadow:0 4px 0 var(--surface)}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:clamp(18px,4vw,30px);display:flex;flex-direction:column;gap:18px}
+.station{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.station .code{font:600 12px var(--f-mono);color:var(--orange);background:var(--orange-soft);padding:3px 7px;border-radius:4px}
+.q{font-size:clamp(17px,2.6vw,20px);font-weight:500;line-height:1.45;max-width:65ch}
+.q code{font-family:var(--f-mono);font-size:.92em;background:var(--sunk);padding:1px 5px;border-radius:4px}
+.opts{display:grid;gap:10px}
+.opt{display:flex;gap:12px;align-items:flex-start;text-align:left;background:var(--sunk);border:1.5px solid transparent;border-radius:8px;padding:12px 14px;line-height:1.4;transition:border-color .15s,background .15s}
+.opt:hover:not(:disabled){border-color:var(--blue)}
+.opt .k{font:600 13px var(--f-mono);color:var(--muted);min-width:1.2em}
+.opt.ok{background:var(--green-soft);border-color:var(--green)}
+.opt.no{background:var(--bad-soft);border-color:var(--bad)}
+.opt:disabled{cursor:default}
+
+.rows{display:grid;gap:8px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--sunk);border-radius:8px;padding:8px 8px 8px 14px;border:1.5px solid transparent}
+.row .txt{min-width:0;line-height:1.35}
+.row .txt.mono{font-size:14px}
+.row.ok{border-color:var(--green)} .row.no{border-color:var(--bad)}
+.seg{display:flex;border:1.5px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{background:var(--surface);border:0;padding:7px 12px;font:600 13px var(--f-mono);min-width:64px}
+.seg button+button{border-left:1.5px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--blue);color:var(--surface)}
+.seg button:disabled{cursor:default}
+select{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:7px;padding:7px 8px;max-width:min(320px,52vw)}
+.row.match{grid-template-columns:minmax(90px,.6fr) minmax(0,1.4fr)}
+.row.match select{max-width:100%;width:100%}
+.ord .row{grid-template-columns:auto minmax(0,1fr) auto}
+.ord .n{font:600 13px var(--f-mono);color:var(--muted);width:1.5em}
+.mv{display:flex;gap:4px}
+.mv button{background:var(--surface);border:1.5px solid var(--line);border-radius:6px;width:34px;height:32px;font-family:var(--f-mono)}
+.mv button:disabled{opacity:.35;cursor:default}
+.numrow{display:flex;flex-wrap:wrap;gap:10px}
+.numrow input{font:500 18px var(--f-mono);color:var(--ink);background:var(--sunk);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;flex:1 1 220px;min-width:0}
+.numrow input.ok{border-color:var(--green)} .numrow input.no{border-color:var(--bad)}
+
+.rules{font:500 13px/1.6 var(--f-mono);background:var(--sunk);border-radius:8px;padding:10px 14px;overflow-x:auto;white-space:pre}
+.rules .al{color:var(--green)} .rules .dr{color:var(--bad)}
+
+.btn{background:var(--ink);color:var(--bg);border:0;border-radius:8px;padding:12px 20px;font-weight:600;align-self:flex-start}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.or{background:var(--orange);color:#fff}
+.btns{display:flex;flex-wrap:wrap;gap:10px}
+
+.fb{border-radius:8px;padding:14px 16px;display:grid;gap:6px;border-left:4px solid}
+.fb.ok{background:var(--green-soft);border-color:var(--green)}
+.fb.no{background:var(--bad-soft);border-color:var(--bad)}
+.fb strong{font-family:var(--f-mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.fb.ok strong{color:var(--green)} .fb.no strong{color:var(--bad)}
+.fb p{max-width:68ch}
+
+/* intro */
+.hero{display:grid;gap:16px}
+.hero p.lead{font-size:18px;max-width:58ch;color:var(--muted)}
+.how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.how div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:grid;gap:4px;min-width:0}
+.how b{font:600 13px var(--f-mono)}
+.how span{font-size:14px;color:var(--muted);line-height:1.4}
+@media (max-width:620px){.how{grid-template-columns:1fr}}
+.list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (max-width:620px){.list{grid-template-columns:1fr}}
+.st{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.st:hover{border-color:var(--orange)}
+.st .c{font:600 11px var(--f-mono);color:var(--orange)}
+.st .nm{font-weight:500;line-height:1.3}
+.st .cnt{font:500 12px var(--f-mono);color:var(--muted)}
+
+/* end */
+.big{font:700 clamp(44px,10vw,72px)/1 var(--f-display);font-variant-numeric:tabular-nums}
+.res{display:grid;gap:6px}
+.res .r{display:grid;grid-template-columns:70px minmax(0,1fr) 120px 44px;gap:10px;align-items:center;font-size:14px}
+.res .r .c{font:600 12px var(--f-mono);color:var(--muted)}
+.bar{height:8px;background:var(--sunk);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--green)}
+.res .r .v{font:500 13px var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.res .r{grid-template-columns:60px minmax(0,1fr) 40px}.res .r .bar{display:none}}
+.miss{display:grid;gap:10px}
+.miss details{background:var(--sunk);border-radius:8px;padding:10px 14px}
+.miss summary{cursor:pointer;font-weight:500}
+.miss details p{margin-top:8px;color:var(--muted);max-width:68ch}
+.foot{font-size:13px;color:var(--muted)}
+
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.shake{animation:shake .25s 2}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+const STATIONS = [
+{code:'A2.1.1',name:'Types of networks',short:'Networks',tag:'NET',qs:[
+ {t:'mc',q:'Wireless earbuds are connected to a phone via Bluetooth. What type of network is this?',o:['PAN','LAN','WAN','VPN'],a:0,w:'A PAN (Personal Area Network) surrounds one person and covers a few metres: earbuds, smartwatch, phone.'},
+ {t:'mc',q:'A bank connects its branches in Astana, Almaty and Shymkent into one network. What type of network is it?',o:['LAN','WAN','PAN','Mesh'],a:1,w:'A WAN (Wide Area Network) spans large geographic distances such as cities and countries. The Internet is also a WAN.'},
+ {t:'mc',q:'Why does an employee use a VPN when working from a café?',o:['To increase Wi-Fi speed','To create an encrypted tunnel to the company network over the public Internet','To get a new MAC address','To replace the router'],a:1,w:'A VPN creates a secure, encrypted tunnel over a public network, so the device works as if it were inside the company network.'}
+]},
+{code:'A2.1.2',name:'Digital infrastructure',short:'Infra',tag:'INF',qs:[
+ {t:'mc',q:'A smart traffic light must react to traffic flow within milliseconds. Which infrastructure fits best?',o:['Cloud computing in a distant data centre','Edge computing close to the sensors','A 3G mobile network only','A distributed ledger'],a:1,w:'Edge computing processes data near its source, so latency is minimal. This is critical for traffic control.'},
+ {t:'mc',q:'A cryptocurrency on a blockchain works without a central server. This is an example of…',o:['Edge computing','A distributed system','A LAN','A PAN'],a:1,w:'Blockchain is a distributed system: a copy of the ledger is stored on many nodes, so there is no single point of failure.'},
+ {t:'mc',q:'Which limitation is typical of cloud services?',o:['They cannot be scaled','Dependency on Internet connectivity and data security concerns','They only work inside a LAN','They do not need servers'],a:1,w:'The cloud scales and is accessible from anywhere, but it does not work without the Internet, and data is stored by a third-party provider.'}
+]},
+{code:'A2.1.3',name:'Network devices',short:'Devices',tag:'DEV',qs:[
+ {t:'match',q:'Match each device to its function.',pairs:[
+   ['Switch','Forwards frames within a LAN using MAC addresses'],
+   ['Router','Chooses the path for packets between networks using a routing table'],
+   ['Modem','Converts digital data to analogue signals and back'],
+   ['WAP','Converts Ethernet data into radio signals'],
+   ['NIC','Connects a device to the network and has a unique MAC address']],
+  w:'A switch works with MAC addresses inside a LAN, a router with IP addresses between networks, a modem links the network to the ISP, a WAP extends the network over radio, and every device has a NIC.'},
+ {t:'mc',q:'Which device connects networks that use different protocols and translates private IP addresses into public ones (NAT)?',o:['Switch','Gateway','NIC','Repeater'],a:1,w:'A gateway connects different networks (office ↔ Internet), performs NAT and can convert between protocols, e.g. VoIP ↔ the traditional phone network.'},
+ {t:'mc',q:'A hardware firewall supports QoS (Quality of Service). What does that mean?',o:['It encrypts every packet','It prioritises important traffic such as video calls and VoIP','It assigns IP addresses','It extends cable length'],a:1,w:'QoS sets priorities: real-time traffic (VoIP, video) goes first so that there is no lag.'}
+]},
+{code:'A2.1.4',name:'Protocols',short:'Protocols',tag:'TCP',qs:[
+ {t:'bin',q:'Which transport protocol suits each case?',l:'TCP',r:'UDP',items:[
+   ['Loading a web page',0],['Real-time online game',1],['Sending an email',0],['VoIP call',1],['Downloading a file',0],['Live video stream',1]],
+  w:'TCP gives reliable, ordered delivery with acknowledgement (handshake, ACK). UDP is connectionless and faster but gives no guarantees; it suits cases where speed matters more than every packet.'},
+ {t:'mc',q:'A laptop joins the school Wi-Fi and instantly receives an IP address, subnet mask, gateway and DNS. Which protocol did this?',o:['HTTP','DHCP','UDP','HTTPS'],a:1,w:'DHCP automatically assigns the IP address, subnet mask, default gateway and DNS. Dynamic allocation is a temporary lease.'},
+ {t:'mc',q:'A user submits a login form with a username and password. Which HTTP method is used?',o:['GET','POST','DHCP','ACK'],a:1,w:'GET requests data (opens a page); POST sends data to the server (a form, a login). It should be HTTPS, so TLS encrypts the password.'},
+ {t:'mc',q:'HTTP is stateless. How does a website “remember” that you are logged in?',o:['Using cookies and sessions','Using the MAC address','Through UDP','Through the modem'],a:0,w:'Cookies are stored on the user’s device and sessions on the server. Together they keep you logged in, save the shopping cart and remember user actions.'}
+]},
+{code:'A2.2.1',name:'Topologies',short:'Topologies',tag:'TOP',qs:[
+ {t:'mc',q:'In a star topology, the central switch fails. What happens?',o:['Nothing, data takes another route','Only one computer is disconnected','All devices lose connection to each other','Speed increases'],a:2,w:'The central node in a star is a single point of failure. One broken cable affects one node; a failed switch takes down the whole network.'},
+ {t:'mc',q:'Which topology is the most reliable but also the most expensive because of the number of links?',o:['Star','Full mesh','Bus','Hybrid'],a:1,w:'In a full mesh every node is linked to every other node: there are alternative routes if a link breaks, but many cables and ports are needed.'},
+ {t:'mc',q:'Each floor of a school has its own star, and the floor switches are linked to each other with redundant connections. This is…',o:['Mesh','Star','Hybrid','PAN'],a:2,w:'A hybrid deliberately combines star and mesh: a cheap star at the access level and a resilient mesh backbone.'}
+]},
+{code:'A2.2.4',name:'Segmentation',short:'Subnets',tag:'SUB',qs:[
+ {t:'mc',q:'Which subnet mask matches the CIDR prefix <code>/24</code>?',o:['255.0.0.0','255.255.0.0','255.255.255.0','255.255.255.255'],a:2,w:'/24 means the first 24 bits are the network part: 11111111.11111111.11111111.00000000 = 255.255.255.0.'},
+ {t:'num',q:'Calculate the bitwise AND: <code>11001100</code> AND <code>10101010</code>',a:['10001000'],ph:'8 bits',w:'1 AND 1 = 1; every other combination gives 0. Ones line up only in the 1st and 5th positions: 10001000.'},
+ {t:'num',q:'A device has the address <code>192.168.10.77/24</code>. What is the network address?',a:['192.168.10.0'],ph:'e.g. 10.0.0.0',w:'IP AND mask 255.255.255.0 keeps the first three octets and zeroes the host part: 192.168.10.0. It is the first address of the subnet.'},
+ {t:'num',q:'What is the broadcast address of the same subnet <code>192.168.10.0/24</code>?',a:['192.168.10.255'],ph:'last address',w:'The broadcast address is the last one in the subnet: all host bits are 1, so 192.168.10.255. Hosts get .1–.254.'},
+ {t:'mc',q:'Accountants work in different buildings but must be on one logical network, separate from students. What should be configured on the switches?',o:['VLAN','Modem','DHCP lease','PAN'],a:0,w:'A VLAN divides one physical network into several logical ones and groups devices by function, not by location.'}
+]},
+{code:'A2.3.1',name:'IP addressing',short:'IP',tag:'IP',qs:[
+ {t:'bin',q:'Private or public address?',l:'Private',r:'Public',mono:true,items:[
+   ['192.168.1.5',0],['8.8.8.8',1],['10.0.0.12',0],['172.16.4.1',0],['142.250.187.174',1],['172.32.0.1',1]],
+  w:'Private ranges: 10.0.0.0/8, 172.16.0.0–172.31.255.255, 192.168.0.0/16. 172.32.0.1 is outside the range, so it is public.'},
+ {t:'mc',q:'How many bits are in an IPv6 address?',o:['32','64','128','256'],a:2,w:'IPv4 has 32 bits (~4.3 billion addresses); IPv6 has 128 bits, written in hexadecimal groups separated by colons.'},
+ {t:'mc',q:'What type of address does a company web server that customers connect to need?',o:['Dynamic private','Static public','Any address from DHCP','A MAC address'],a:1,w:'A server needs an address that does not change (static) and is reachable from the Internet (public); otherwise the DNS record would point nowhere.'},
+ {t:'mc',q:'Why does a home router use NAT?',o:['So all home devices reach the Internet through one public IP','To encrypt Wi-Fi','To increase cable speed','To assign MAC addresses'],a:0,w:'NAT translates private addresses into one public address. This conserves IPv4 addresses and hides the internal network.'}
+]},
+{code:'A2.3.2',name:'Transmission media',short:'Media',tag:'MED',qs:[
+ {t:'mc',q:'What should be used for a data-centre backbone: huge bandwidth, long distances, no electromagnetic interference?',o:['Twisted pair','Fibre-optic','Wi-Fi','Bluetooth'],a:1,w:'Fibre-optic cable carries light: maximum bandwidth, low attenuation and immunity to electromagnetic interference.'},
+ {t:'mc',q:'Desk VoIP phones need both data and power (PoE) over one cable. What should be used?',o:['Fibre-optic','Twisted-pair copper','Radio link','Satellite'],a:1,w:'Twisted-pair copper is cheap, easy to terminate with hand tools and supports Power-over-Ethernet.'},
+ {t:'mc',q:'Which medium is easiest to intercept (eavesdropping)?',o:['Fibre-optic','Twisted pair','Wireless radio','All are equal'],a:2,w:'Radio signals spread in all directions, so wireless networks need strict security measures such as WPA3.'},
+ {t:'mc',q:'What is attenuation?',o:['Signal weakening as distance increases','Signal encryption','Dividing a network into subnets','Modem speed'],a:0,w:'Attenuation is the loss of signal strength as it travels through a medium. It is stronger in copper and radio than in fibre.'}
+]},
+{code:'A2.3.3',name:'Packet switching',short:'Packets',tag:'PKT',qs:[
+ {t:'order',q:'You place a stone block in Minecraft. Put the stages of sending this action to the server in order.',steps:[
+   'The action data is split into packets (segmentation)',
+   'A header with the source and destination addresses is added to each packet',
+   'Control information is added: sequence numbers and error checking',
+   'Packets are sent independently, each by its own route',
+   'The server reassembles the packets using sequence numbers (decapsulation)'],
+  w:'Encapsulation (splitting and wrapping with headers) → independent transmission → routing by routers → reassembly at the server using sequence numbers.'},
+ {t:'mc',q:'Packets arrived at the server out of order. How does the server rebuild the original data?',o:['Using MAC addresses','Using sequence numbers in the headers','By arrival time','It cannot; the data is lost'],a:1,w:'Sequence numbers show the reassembly order. If a packet is missing or damaged, the server asks for it to be resent.'},
+ {t:'mc',q:'Who decides which route each packet takes across the Internet?',o:['The sender, in advance','Routers at each hop, based on network traffic','The modem','The DNS server'],a:1,w:'The route is chosen dynamically for each packet: one may travel via New York, another via Chicago.'}
+]},
+{code:'A2.4.1',name:'Firewalls',short:'Firewall',tag:'FW',qs:[
+ {t:'bin',q:'You are the firewall. Rules are checked top to bottom and the first match decides. What do you do with each packet?',
+  rules:'1  DROP   src 203.0.113.*        any\n2  ALLOW  TCP  dst port 443      HTTPS\n3  ALLOW  TCP  dst port 80       HTTP\n4  ALLOW  UDP  dst port 53       DNS\n*  DROP   everything else (default)',
+  l:'ALLOW',r:'DROP',mono:true,items:[
+   ['TCP 198.51.100.7 → :443',0],['TCP 203.0.113.9 → :443',1],['UDP 198.51.100.20 → :53',0],['TCP 198.51.100.7 → :23',1],['TCP 192.0.2.44 → :80',0]],
+  w:'203.0.113.9 is dropped by rule 1 even though port 443 is allowed: rule order matters. Port 23 (Telnet) is not allowed by any rule, so the default DROP applies.'},
+ {t:'mc',q:'What is a whitelist in firewall rules?',o:['Only the listed addresses are blocked','Only explicitly permitted IPs, ports or protocols are allowed','All packets are allowed','A list of passwords'],a:1,w:'A whitelist lets through only what is permitted and blocks everything else. A blacklist is the opposite: it blocks what is listed and allows the rest.'},
+ {t:'mc',q:'How does NAT improve security?',o:['It encrypts traffic','Unsolicited inbound packets are dropped and internal addresses are hidden','It removes viruses','It speeds up DNS'],a:1,w:'Address hiding + implicit filtering: outsiders see only the public IP, and only responses to outbound connections are let back in.'}
+]},
+{code:'A2.4.4',name:'Encryption & certificates',short:'Encryption',tag:'TLS',qs:[
+ {t:'mc',q:'Anna wants to send Ben a secret message using asymmetric encryption. Which key does she encrypt it with?',o:['Her own private key','Ben’s public key','Ben’s private key','A shared password'],a:1,w:'You encrypt with the recipient’s public key; only the owner of the private key, Ben, can decrypt it.'},
+ {t:'mc',q:'What does a website’s digital certificate confirm?',o:['The server’s speed','That the public key belongs to this site, as verified by a Certificate Authority (CA)','That the site has no cookies','The user’s IP address'],a:1,w:'A certificate binds a public key to a real-world identity (the domain) and is signed by a trusted CA. The browser checks the signature before setting up TLS.'},
+ {t:'mc',q:'Why is data encrypted symmetrically after the TLS handshake?',o:['Symmetric encryption is much faster','Asymmetric encryption is forbidden','So that no key is needed','To make it easier to crack'],a:0,w:'Asymmetric encryption is used to agree safely on a shared session key. After that, a fast symmetric cipher protects all the traffic.'}
+]}
+];
+
+const $ = (s,el=document)=>el.querySelector(s);
+const app = $('#app');
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle = a => {a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const TTL_MAX = 6;
+let G = null;
+let best = 0; try{best = +localStorage.getItem('packetrun-best')||0}catch(e){}
+
+function intro(){
+  G=null;
+  const total = STATIONS.reduce((n,s)=>n+s.qs.length,0);
+  app.innerHTML = `
+  <div class="cable"></div>
+  <section class="hero">
+    <span class="eyebrow">IB Computer Science · Topic A2 · Network</span>
+    <h1>Packet Run</h1>
+    <p class="lead">You are a data packet. Travel from a laptop to the server through 11 network nodes. Each node holds a challenge from one lesson of topic A2.</p>
+  </section>
+  <div class="how">
+    <div><b>TTL = ${TTL_MAX}</b><span>Every mistake costs one hop. At TTL 0 the packet is dropped.</span></div>
+    <div><b>+100 / streak</b><span>A correct answer earns 100 points; a streak without mistakes adds a bonus.</span></div>
+    <div><b>${total} challenges</b><span>Multiple choice, sorting, subnet calculations, a firewall and ordering steps.</span></div>
+  </div>
+  <div class="btns">
+    <button class="btn or" id="go">Send the packet</button>
+    ${best?`<span class="foot mono" style="align-self:center">Best: ${best}</span>`:''}
+  </div>
+  <section style="display:grid;gap:10px">
+    <span class="eyebrow">Or practise a single node</span>
+    <div class="list">${STATIONS.map((s,i)=>`
+      <button class="st" data-i="${i}"><span class="c">${s.code}</span><span class="nm">${s.name}</span><span class="cnt">${s.qs.length}</span></button>`).join('')}
+    </div>
+  </section>
+  <p class="foot">Challenges are based on the lesson 1–10 slides from the course folder.</p>`;
+  $('#go').onclick=()=>start(STATIONS.map((_,i)=>i));
+  app.querySelectorAll('.st').forEach(b=>b.onclick=()=>start([+b.dataset.i]));
+}
+
+function start(list){
+  const queue=[];
+  list.forEach(si=>STATIONS[si].qs.forEach((_,qi)=>queue.push([si,qi])));
+  G={list,queue,pos:0,ttl:TTL_MAX,score:0,streak:0,res:{},miss:[],full:list.length===STATIONS.length};
+  list.forEach(si=>G.res[si]={ok:0,n:STATIONS[si].qs.length});
+  shell(); render();
+}
+
+function shell(){
+  app.innerHTML=`
+  <div class="cable"></div>
+  <div class="hdr" aria-label="Packet header">
+    <div class="hdr-row">
+      <div><span>SRC</span><b>10.0.0.42</b></div>
+      <div><span>DST</span><b>server:443</b></div>
+      <div class="ttl" id="h-ttl"><span>TTL</span><b></b></div>
+      <div><span>SEQ</span><b id="h-seq"></b></div>
+      <div><span>Score</span><b id="h-score"></b></div>
+      <div><span>Streak</span><b id="h-streak"></b></div>
+    </div>
+  </div>
+  <div class="track-wrap"><div class="track" id="track">
+    <div class="fill" id="fill"></div>
+    ${G.list.map(si=>`<div class="node" data-si="${si}"><i>${STATIONS[si].tag}</i><em>${STATIONS[si].short}</em></div>`).join('')}
+    <div class="node srv" data-si="srv"><i>SRV</i><em>Server</em></div>
+    <div class="pkt" id="pkt"></div>
+  </div></div>
+  <div class="card" id="card"></div>
+  <div class="btns"><button class="btn alt" id="quit">Menu</button></div>`;
+  $('#quit').onclick=intro;
+}
+
+function hud(){
+  const t=$('#h-ttl'); t.querySelector('b').textContent=G.ttl+' / '+TTL_MAX; t.classList.toggle('low',G.ttl<=2);
+  $('#h-seq').textContent=Math.min(G.pos+1,G.queue.length)+'/'+G.queue.length;
+  $('#h-score').textContent=G.score; $('#h-streak').textContent='×'+G.streak;
+  const cur = G.pos<G.queue.length ? G.queue[G.pos][0] : 'srv';
+  const nodes=[...document.querySelectorAll('.node')];
+  let curIdx=0;
+  nodes.forEach((n,k)=>{
+    const si=n.dataset.si; n.className='node'+(si==='srv'?' srv':'');
+    if(si==cur){n.classList.add('cur');curIdx=k}
+    else if(si!=='srv'){const done=G.queue.slice(0,G.pos).filter(q=>q[0]==si).length; if(done===STATIONS[si].qs.length) n.classList.add(G.res[si].ok===G.res[si].n?'done':'part')}
+  });
+  const node=nodes[curIdx], tr=$('#track');
+  const x=node.offsetLeft+node.offsetWidth/2;
+  $('#pkt').style.left=(x-9)+'px';
+  $('#fill').style.width=Math.max(0,x-20)+'px';
+  const wrap=tr.parentElement; const target=x-wrap.clientWidth/2;
+  try{wrap.scrollTo({left:target,behavior:'smooth'})}catch(e){wrap.scrollLeft=target}
+}
+
+function render(){
+  hud();
+  if(G.pos>=G.queue.length) return finish(true);
+  const [si,qi]=G.queue[G.pos], S=STATIONS[si], Q=S.qs[qi];
+  const card=$('#card');
+  card.innerHTML=`
+    <div class="station"><span class="code">${S.code}</span><h2>${S.name}</h2><span class="eyebrow">challenge ${qi+1} of ${S.qs.length}</span></div>
+    <p class="q">${Q.q}</p>
+    ${Q.rules?`<div class="rules">${esc(Q.rules).replace(/ALLOW/g,'<span class="al">ALLOW</span>').replace(/DROP/g,'<span class="dr">DROP</span>')}</div>`:''}
+    <div id="body"></div><div id="fb"></div>`;
+  const body=$('#body');
+  ({mc:rMC,bin:rBin,match:rMatch,order:rOrder,num:rNum})[Q.t](body,Q);
+  const f=card.querySelector('button,input,select'); if(f) f.focus({preventScroll:true});
+}
+
+function rMC(body,Q){
+  const order=shuffle(Q.o.map((_,i)=>i));
+  body.innerHTML=`<div class="opts">${order.map((i,k)=>`<button class="opt" data-i="${i}"><span class="k">${'ABCD'[k]}</span><span>${Q.o[i]}</span></button>`).join('')}</div>`;
+  body.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+    const pick=+b.dataset.i, ok=pick===Q.a;
+    body.querySelectorAll('.opt').forEach(x=>{x.disabled=true; if(+x.dataset.i===Q.a) x.classList.add('ok')});
+    if(!ok) b.classList.add('no');
+    answer(ok,Q);
+  });
+}
+
+function rBin(body,Q){
+  const items=shuffle(Q.items.map((it,i)=>({t:it[0],a:it[1],i})));
+  const pick={};
+  body.innerHTML=`<div class="rows">${items.map(it=>`
+    <div class="row" data-i="${it.i}"><span class="txt${Q.mono?' mono':''}">${esc(it.t)}</span>
+      <div class="seg" role="group" aria-label="${esc(it.t)}"><button data-v="0" aria-pressed="false">${Q.l}</button><button data-v="1" aria-pressed="false">${Q.r}</button></div></div>`).join('')}</div>
+    <button class="btn" id="chk" disabled style="margin-top:14px">Check</button>`;
+  body.querySelectorAll('.row').forEach(r=>r.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
+    pick[r.dataset.i]=+b.dataset.v;
+    r.querySelectorAll('.seg button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+    $('#chk').disabled=Object.keys(pick).length<items.length;
+  }));
+  $('#chk').onclick=()=>{
+    let ok=true;
+    items.forEach(it=>{const r=body.querySelector(`.row[data-i="${it.i}"]`); const good=pick[it.i]===it.a; ok=ok&&good; r.classList.add(good?'ok':'no'); r.querySelectorAll('button').forEach(x=>x.disabled=true);
+      if(!good){const lbl=document.createElement('span');lbl.className='eyebrow';lbl.style.gridColumn='1/-1';lbl.textContent='Correct: '+(it.a?Q.r:Q.l);r.appendChild(lbl)}});
+    $('#chk').remove(); answer(ok,Q);
+  };
+}
+
+function rMatch(body,Q){
+  const fns=shuffle(Q.pairs.map(p=>p[1]));
+  body.innerHTML=`<div class="rows">${Q.pairs.map((p,i)=>`
+    <div class="row match" data-i="${i}"><b class="mono">${p[0]}</b>
+      <select id="m${i}" aria-label="Function of ${p[0]}"><option value="">— choose a function —</option>${fns.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div>`).join('')}</div>
+    <button class="btn" id="chk" disabled style="margin-top:14px">Check</button>`;
+  const sels=[...body.querySelectorAll('select')];
+  sels.forEach(s=>s.onchange=()=>{$('#chk').disabled=sels.some(x=>!x.value)});
+  $('#chk').onclick=()=>{
+    let ok=true;
+    sels.forEach((s,i)=>{const good=s.value===Q.pairs[i][1]; ok=ok&&good; const r=s.closest('.row'); r.classList.add(good?'ok':'no'); s.disabled=true;
+      if(!good){const lbl=document.createElement('span');lbl.className='eyebrow';lbl.style.gridColumn='1/-1';lbl.style.textTransform='none';lbl.style.letterSpacing='0';lbl.textContent='Correct: '+Q.pairs[i][1];r.appendChild(lbl)}});
+    $('#chk').remove(); answer(ok,Q);
+  };
+}
+
+function rOrder(body,Q){
+  let cur=shuffle(Q.steps.map((_,i)=>i));
+  if(cur.every((v,i)=>v===i)) cur.reverse();
+  const draw=()=>{
+    body.innerHTML=`<div class="rows ord">${cur.map((s,k)=>`
+      <div class="row" data-s="${s}"><span class="n">${k+1}</span><span class="txt">${Q.steps[s]}</span>
+        <span class="mv"><button data-k="${k}" data-d="-1" aria-label="Move up" ${k===0?'disabled':''}>↑</button><button data-k="${k}" data-d="1" aria-label="Move down" ${k===cur.length-1?'disabled':''}>↓</button></span></div>`).join('')}</div>
+      <button class="btn" id="chk" style="margin-top:14px">Check order</button>`;
+    body.querySelectorAll('.mv button').forEach(b=>b.onclick=()=>{const k=+b.dataset.k,d=+b.dataset.d;[cur[k],cur[k+d]]=[cur[k+d],cur[k]];draw();const nb=body.querySelector(`.mv button[data-k="${k+d}"][data-d="${d}"]`)||body.querySelector(`.mv button[data-k="${k+d}"]`);nb&&nb.focus()});
+    $('#chk').onclick=()=>{
+      let ok=true;
+      body.querySelectorAll('.row').forEach((r,k)=>{const good=+r.dataset.s===k; ok=ok&&good; r.classList.add(good?'ok':'no')});
+      body.querySelectorAll('.mv button').forEach(x=>x.disabled=true);
+      $('#chk').remove();
+      if(!ok){const p=document.createElement('div');p.className='rows ord';p.style.marginTop='12px';p.innerHTML='<span class="eyebrow">Correct order</span>'+Q.steps.map((s,i)=>`<div class="row" style="grid-template-columns:auto minmax(0,1fr)"><span class="n">${i+1}</span><span class="txt">${s}</span></div>`).join('');body.appendChild(p)}
+      answer(ok,Q);
+    };
+  };
+  draw();
+}
+
+function rNum(body,Q){
+  body.innerHTML=`<form class="numrow" id="nf"><input id="ni" autocomplete="off" spellcheck="false" placeholder="${esc(Q.ph||'')}" aria-label="Answer"><button class="btn" type="submit">Check</button></form>`;
+  $('#nf').onsubmit=e=>{
+    e.preventDefault(); const inp=$('#ni'); const v=inp.value.replace(/\s+/g,'').trim();
+    if(!v){inp.classList.add('shake');setTimeout(()=>inp.classList.remove('shake'),500);return}
+    const ok=Q.a.includes(v); inp.classList.add(ok?'ok':'no'); inp.disabled=true; $('#nf button').remove();
+    if(!ok){const p=document.createElement('span');p.className='eyebrow';p.style.alignSelf='center';p.textContent='Correct: '+Q.a[0];$('#nf').appendChild(p)}
+    answer(ok,Q);
+  };
+}
+
+function answer(ok,Q){
+  const si=G.queue[G.pos][0];
+  if(ok){G.streak++; G.score+=100+Math.min(G.streak-1,5)*20; G.res[si].ok++}
+  else{G.streak=0; G.ttl--; G.miss.push({si,q:Q}); $('#card').classList.add('shake'); setTimeout(()=>$('#card')&&$('#card').classList.remove('shake'),500)}
+  hud();
+  const dead=G.ttl<=0;
+  const last=G.pos===G.queue.length-1;
+  $('#fb').innerHTML=`<div class="fb ${ok?'ok':'no'}"><strong>${ok?'ACK · packet accepted':'NACK · TTL −1'}</strong><p>${Q.w}</p></div>
+    <button class="btn or" id="nx" style="margin-top:14px">${dead?'Packet dropped…':last?'Deliver to server':'Next hop →'}</button>`;
+  $('#nx').focus();
+  $('#nx').onclick=()=>{ if(dead) return finish(false); G.pos++; render(); window.scrollTo({top:0,behavior:'smooth'}) };
+}
+
+function finish(delivered){
+  const total=G.queue.length, ok=Object.values(G.res).reduce((n,r)=>n+r.ok,0);
+  if(delivered){ G.score+=G.ttl*150; }
+  if(G.full&&delivered&&G.score>best){best=G.score;try{localStorage.setItem('packetrun-best',best)}catch(e){}}
+  const pct=Math.round(ok/total*100);
+  const verdict = !delivered ? 'TTL expired. The packet was dropped at the “'+STATIONS[G.queue[G.pos][0]].name+'” node.'
+    : pct===100 ? 'Delivered without a single mistake. Excellent command of topic A2.'
+    : pct>=80 ? 'Delivered. Review the few topics below.'
+    : 'Delivered, but with losses. Review your mistakes and try again.';
+  hud();
+  $('#card').innerHTML=`
+    <span class="eyebrow">${delivered?'HTTP 200 · Delivered':'ICMP · Time Exceeded'}</span>
+    <h2>${delivered?'Packet delivered':'Packet dropped'}</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end">
+      <div><div class="big">${G.score}</div><span class="eyebrow">points${delivered?' · TTL bonus +'+G.ttl*150:''}</span></div>
+      <div><div class="big" style="color:var(--green)">${ok}<span style="color:var(--muted);font-size:.5em">/${total}</span></div><span class="eyebrow">correct answers</span></div>
+    </div>
+    <p>${verdict}</p>
+    <div class="res">${G.list.map(si=>{const r=G.res[si],S=STATIONS[si];return `<div class="r"><span class="c">${S.code}</span><span>${S.name}</span><span class="bar"><i style="width:${r.ok/r.n*100}%"></i></span><span class="v">${r.ok}/${r.n}</span></div>`}).join('')}</div>
+    ${G.miss.length?`<div class="miss"><span class="eyebrow">Review your mistakes</span>${G.miss.map(m=>`<details><summary>${STATIONS[m.si].code} · ${m.q.q.replace(/<[^>]+>/g,'')}</summary><p>${m.q.w}</p></details>`).join('')}</div>`:''}
+    <div class="btns">
+      ${!delivered?'<button class="btn or" id="retry">Retry this node (TTL restored)</button>':''}
+      <button class="btn ${delivered?'or':'alt'}" id="again">New route</button>
+      <button class="btn alt" id="menu">Menu</button>
+    </div>`;
+  const re=$('#retry'); if(re) re.onclick=()=>{const si=G.queue[G.pos][0]; const first=G.queue.findIndex(q=>q[0]===si); G.res[si].ok=0; G.miss=G.miss.filter(m=>m.si!==si); G.pos=first; G.ttl=TTL_MAX; G.streak=0; render()};
+  $('#again').onclick=()=>start(G.list);
+  $('#menu').onclick=intro;
+}
+
+window.addEventListener('resize',()=>{if(G&&$('#track'))hud()});
+intro();
+</script>
+</body>
+</html>
