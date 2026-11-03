@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Key Quest A3</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a schema map of entity-box stations; each station plays as a stack of rounds on a single card */
+:root{
+  --bg:#EDF1F6; --surface:#FFFFFF; --ink:#16213A; --muted:#5B6680; --line:#C9D2E0; --chip:#E2E8F1;
+  --accent:#D88E00; --accent-soft:#FBEBC6; --accent-ink:#3A2600;
+  --ok:#0F8A6A; --ok-soft:#D7F1E8; --bad:#C8372D; --bad-soft:#F9DEDB;
+  --head:#16213A; --head-ink:#F3F6FB;
+  --f-display:"Chakra Petch", "Arial Narrow", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1424; --surface:#172036; --ink:#E7ECF5; --muted:#93A0BA; --line:#2A3652; --chip:#1F2A44;
+  --accent:#F4B532; --accent-soft:#3A2F14; --accent-ink:#1A1200;
+  --ok:#3CC79E; --ok-soft:#123A30; --bad:#FF6B5E; --bad-soft:#41201E;
+  --head:#26324F; --head-ink:#F3F6FB; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#0E1424; --surface:#172036; --ink:#E7ECF5; --muted:#93A0BA; --line:#2A3652; --chip:#1F2A44;
+  --accent:#F4B532; --accent-soft:#3A2F14; --accent-ink:#1A1200;
+  --ok:#3CC79E; --ok-soft:#123A30; --bad:#FF6B5E; --bad-soft:#41201E;
+  --head:#26324F; --head-ink:#F3F6FB; color-scheme:dark }
+
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.5;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:24px 48px;
+  background-image:linear-gradient(var(--line) 1px, transparent 1px),linear-gradient(90deg,var(--line) 1px, transparent 1px);
+  background-size:32px 32px;background-attachment:fixed}
+body::after{content:"";position:fixed;inset:0;background:var(--bg);opacity:.86;z-index:-1;pointer-events:none}
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,.tile:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.1}
+.mono{font-family:var(--f-mono)}
+.label{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.brand h1{font-size:clamp(40px,8vw,68px);letter-spacing:.02em;display:flex;align-items:center;gap:14px}
+.brand h1 svg{width:.8em;height:.8em;flex:none}
+.brand p{margin:6px 0 0;color:var(--muted);max-width:52ch}
+.totals{display:flex;gap:10px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 14px;min-width:92px}
+.stat b{display:block;font-family:var(--f-display);font-size:24px;font-variant-numeric:tabular-nums}
+
+/* map */
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
+.entity{background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;text-align:left;padding:0;display:flex;flex-direction:column;
+  transition:transform .15s, box-shadow .15s;box-shadow:4px 4px 0 var(--line)}
+.entity:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--accent)}
+.entity .eh{background:var(--head);color:var(--head-ink);padding:8px 12px;font-family:var(--f-mono);font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.entity .eb{padding:12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.entity h3{font-size:21px}
+.entity .attr{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.entity .attr .k{color:var(--accent);font-weight:600;width:22px}
+.entity .ef{border-top:1px dashed var(--line);padding:8px 12px;display:flex;justify-content:space-between;align-items:center}
+.stars{letter-spacing:2px;color:var(--line);font-size:18px}
+.stars .on{color:var(--accent)}
+.entity.final{grid-column:1/-1;border-color:var(--accent);box-shadow:4px 4px 0 var(--accent-soft)}
+.entity.final .eh{background:var(--accent);color:var(--accent-ink)}
+.map-foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:14px}
+.linkbtn{background:none;border:none;padding:0;text-decoration:underline;color:var(--muted)}
+
+/* game */
+.hud{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;padding:10px 14px}
+.hud .back{background:var(--chip);border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-family:var(--f-mono);font-size:13px}
+.hud .title{font-family:var(--f-display);font-size:20px;flex:1;min-width:160px}
+.keys{display:flex;gap:4px}
+.keys svg{width:26px;height:26px;transition:opacity .3s, transform .3s}
+.keys svg.lost{opacity:.18;transform:rotate(-30deg)}
+.score{font-family:var(--f-display);font-size:22px;font-variant-numeric:tabular-nums;min-width:70px;text-align:right}
+.streak{font-family:var(--f-mono);font-size:12px;color:var(--accent);min-width:60px}
+.pips{display:flex;gap:4px}
+.pips i{display:block;height:6px;flex:1;background:var(--chip);border-radius:2px}
+.pips i.ok{background:var(--ok)} .pips i.bad{background:var(--bad)} .pips i.cur{background:var(--accent)}
+
+.card{background:var(--surface);border:1.5px solid var(--ink);border-radius:4px;padding:clamp(16px,3vw,28px);display:flex;flex-direction:column;gap:18px}
+.card .qmeta{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.prompt{font-size:clamp(18px,2.4vw,22px);font-weight:500;line-height:1.35;max-width:62ch;text-wrap:pretty}
+.prompt code,.explain code,.opt code{font-family:var(--f-mono);font-size:.88em;background:var(--chip);padding:1px 5px;border-radius:3px}
+
+.opts{display:grid;gap:10px}
+.opt{text-align:left;background:var(--bg);border:1.5px solid var(--line);border-radius:4px;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s}
+.opt:hover:not(:disabled){border-color:var(--ink)}
+.opt .n{font-family:var(--f-mono);font-size:12px;color:var(--muted);padding-top:3px;min-width:16px}
+.opt.right{border-color:var(--ok);background:var(--ok-soft)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.opt:disabled{cursor:default}
+.opt u{text-decoration-thickness:2px;text-underline-offset:3px}
+
+/* db tables */
+.tblwrap{overflow-x:auto;max-width:100%}
+.tbl{border:1.5px solid var(--ink);border-radius:3px;display:inline-block;min-width:min(100%,320px)}
+.tbl .tn{background:var(--head);color:var(--head-ink);font-family:var(--f-mono);font-size:12.5px;font-weight:600;padding:5px 10px}
+table{border-collapse:collapse;font-family:var(--f-mono);font-size:13.5px;font-variant-numeric:tabular-nums;width:100%}
+th,td{padding:7px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:600;background:var(--chip)}
+th .tag{font-size:10px;color:var(--accent);margin-left:6px}
+tr:last-child td{border-bottom:none}
+tr.hl td{background:var(--accent-soft)}
+.pickable th,.pickable td{cursor:pointer}
+.pickable .colhov{background:var(--accent-soft)}
+.pickable .colsel{background:var(--accent);color:var(--accent-ink)}
+.pickable .colok{background:var(--ok-soft)} .pickable .colbad{background:var(--bad-soft)}
+.tables{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.tables > *{min-width:0}
+
+/* sort */
+.sortlist{display:grid;gap:8px}
+.srow{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px;padding:10px 12px;border:1.5px solid var(--line);border-radius:4px;background:var(--bg)}
+.srow .txt{flex:1 1 240px;min-width:0}
+.srow.right{border-color:var(--ok);background:var(--ok-soft)} .srow.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.seg{display:flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;flex-wrap:wrap}
+.seg button{background:var(--surface);border:none;border-right:1px solid var(--line);padding:5px 10px;font-family:var(--f-mono);font-size:12px}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.srow .fix{font-family:var(--f-mono);font-size:12px;color:var(--bad);flex-basis:100%}
+
+/* sql builder */
+.sql-line{min-height:64px;border:1.5px dashed var(--ink);border-radius:4px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;background:var(--bg)}
+.sql-line:empty::before{content:"Click tiles below to build your query…";color:var(--muted);font-size:14px;align-self:center}
+.pool{display:flex;flex-wrap:wrap;gap:8px}
+.tile{font-family:var(--f-mono);font-size:13.5px;border:1.5px solid var(--ink);background:var(--surface);border-radius:3px;padding:6px 10px;box-shadow:2px 2px 0 var(--line)}
+.tile.kw{background:var(--ink);color:var(--surface);font-weight:600}
+.tile:hover{transform:translateY(-1px)}
+.sql-line .tile{box-shadow:none}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{border:1.5px solid var(--ink);background:var(--accent);color:var(--accent-ink);font-family:var(--f-display);font-weight:700;font-size:17px;letter-spacing:.03em;padding:9px 20px;border-radius:4px;box-shadow:3px 3px 0 var(--ink)}
+.btn:hover:not(:disabled){transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--ink)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.ghost{background:var(--surface);color:var(--ink)}
+
+/* feedback */
+.fb{border-left:5px solid var(--ok);background:var(--ok-soft);padding:14px 16px;border-radius:0 4px 4px 0;display:flex;flex-direction:column;gap:10px}
+.fb.bad{border-color:var(--bad);background:var(--bad-soft)}
+.fb h3{font-size:20px}
+.explain{margin:0;max-width:66ch}
+.fb .answer{font-family:var(--f-mono);font-size:13px;background:var(--surface);border:1px solid var(--line);padding:8px 10px;border-radius:3px;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+
+/* end */
+.end{text-align:center;align-items:center}
+.end .big{font-family:var(--f-display);font-size:clamp(48px,10vw,80px);line-height:1;font-variant-numeric:tabular-nums}
+.end .stars{font-size:40px;letter-spacing:8px}
+.end p{color:var(--muted);max-width:50ch;margin:0}
+
+@keyframes pop{0%{transform:scale(.97);opacity:.4}100%{transform:none;opacity:1}}
+.card{animation:pop .22s ease-out}
+@keyframes shake{20%,60%{transform:translateX(-5px)}40%,80%{transform:translateX(5px)}}
+.shake{animation:shake .35s}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:520px){.hud .title{order:-1;flex-basis:100%}.totals{width:100%}.stat{flex:1}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap" id="app"></div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="key" viewBox="0 0 32 32"><circle cx="10" cy="16" r="6.5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M16.5 16H29M24 16v5M28 16v4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+</svg>
+
+<script>
+const T = (name, cols, rows, extra={}) => ({name, cols, rows, ...extra});
+const NF = ["Not in 1NF","In 1NF, not 2NF","In 2NF, not 3NF","In 3NF"];
+const TYPES = ["INTEGER","VARCHAR(50)","DECIMAL(6,2)","DATE","BOOLEAN"];
+
+const USERS = T("Users",["ID","Name","Subscription","JoinDate"],[
+  [1,"Aruzhan","Gold","2012-03-14"],[2,"Daniyar","Silver","2019-07-02"],[3,"Mira","Bronze","2014-11-20"],
+  [4,"Timur","Gold","2021-01-09"],[5,"Leyla","Silver","2010-05-30"]],{pk:[0]});
+const PRODUCTS = T("Products",["ProdID","ProdName","Price","SupID"],[
+  ["P1","Carrots","3.50","S1"],["P2","Tomatoes","4.00","S1"],["P3","Peppers","7.25","S1"],
+  ["P4","Asparagus","12.00","S1"],["P5","Apples","5.00","S2"],["P6","Avocado","10.00","S1"]],{pk:[0],fk:[3]});
+const SUPPLIERS = T("Suppliers",["SupID","SupName"],[["S1","Veggy Co."],["S2","FarmFresh"]],{pk:[0]});
+const CARS = T("Cars",["LicPlat","Colour","BID","BName","BOwner"],[
+  ["11205","Red",2,"DriveX","Amir Sadykov"],["55018","White",1,"Motora","Yifan Zhao"],["60231","Grey",2,"DriveX","Amir Sadykov"]],{pk:[0]});
+
+const STATIONS = [
+{ id:"rel", table:"relational_basics", title:"Relational Basics", codes:["A3.1.1"], attrs:["keys","benefits","limitations"], qs:[
+  {type:"pick", prompt:"Click the <b>primary key</b> of this table.",
+   table:T("Students",["StudentID","FullName","ClassID","DateOfBirth"],[[101,"Ali Nurlan","11A","2008-04-02"],[102,"Dana Sapar","11A","2008-09-17"],[103,"Ali Nurlan","11B","2009-01-23"]]),
+   answer:[0], explain:"<code>StudentID</code> is unique for every row. Names can repeat (look at Ali Nurlan), and many students share a <code>ClassID</code>."},
+  {type:"pick", prompt:"Enrolment links students to courses. Select the <b>two columns</b> that together form the composite key.",
+   table:T("Enrolment",["StudentID","CourseID","EnrolDate","Grade"],[[101,"CS1","2025-09-01",6],[101,"MA2","2025-09-01",5],[102,"CS1","2025-09-03",7]]),
+   answer:[0,1], explain:"Neither <code>StudentID</code> nor <code>CourseID</code> is unique alone, but the pair (StudentID, CourseID) identifies each enrolment. A key made of two or more fields is a composite key."},
+  {type:"pick", prompt:"Click the <b>foreign key</b> in the Orders table.",
+   table:T("Orders",["OrderID","CustomerID","OrderDate","Total"],[[5001,"C17","2026-02-11","42.90"],[5002,"C03","2026-02-11","8.00"],[5003,"C17","2026-02-12","19.50"]]),
+   answer:[1], explain:"<code>CustomerID</code> refers to the primary key of a Customers table. Foreign keys are how relational tables are linked."},
+  {type:"sort", prompt:"Sort each point: benefit or limitation of a relational database?", buckets:["Benefit","Limitation"], items:[
+    ["Data integrity enforced by keys and constraints",0],["Reduced data duplication",0],["Concurrency control for many users at once",0],["Reliable transaction processing",0],
+    ["Rigid schema that is hard to change",1],["Poor fit for unstructured data such as video",1],["Object-relational impedance mismatch with OOP code",1],["Hard to scale for big data workloads",1]],
+   explain:"Benefits come from structure: integrity, less redundancy, safe concurrent access and transactions. Limitations come from the same structure: fixed schemas, awkward fit for unstructured or hierarchical data, mismatch with objects, and scaling limits."},
+  {type:"mcq", prompt:"Which system is the <b>weakest</b> fit for a relational database?", options:[
+    "A bank's account ledger","A school's timetable and grades","A social platform storing millions of videos and varied, unstructured posts","An airline seat booking system"],
+   answer:2, explain:"Unstructured, rapidly changing and very large data does not fit fixed tables well. Banking, school records and bookings need integrity and transactions, which is exactly what relational databases do best."},
+  {type:"mcq", prompt:"A relationship between two tables is created by…", options:[
+    "a foreign key in one table that references the primary key of another","storing both tables in the same file","giving both tables a column with the same name","sorting both tables by the same field"],
+   answer:0, explain:"The foreign key holds values of the other table's primary key, so each row can be matched to a related row."}
+]},
+{ id:"sch", table:"database_schemas", title:"Schemas", codes:["A3.2.1"], attrs:["conceptual","logical","physical"], qs:[
+  {type:"sort", prompt:"Which schema level does each description belong to?", buckets:["Conceptual","Logical","Physical"], items:[
+    ["Entities Customer and Order: a Customer places many Orders",0],["Independent of any specific DBMS",0],
+    ["Table Customer(CustomerID PK, Email NOT NULL)",1],["Tables normalised to 3NF",1],
+    ["B-tree index on the Email column",2],["Data stored in 8 KB blocks on disk",2]],
+   explain:"Conceptual = real-world entities and relationships. Logical = tables, keys, constraints, normalisation. Physical = how data is stored and accessed on hardware (files, indexes, blocks)."},
+  {type:"mcq", prompt:"Which schema level gives the <b>highest level of abstraction</b>?", options:["Conceptual","Logical","Physical","External file"], answer:0,
+   explain:"The conceptual schema is the big-picture view of the whole database, with no implementation detail. Each level below it is more detailed and closer to the hardware."},
+  {type:"mcq", prompt:"Which is a characteristic of a <b>logical</b> schema?", options:[
+    "Defines tables, columns, primary and foreign keys","Describes file organisation and index structures","Shows only business entities, with no keys or data types","Specifies block size and partitioning"],
+   answer:0, explain:"The logical schema turns the conceptual design into relations: tables, attributes with data types, keys, integrity constraints, and normalisation."},
+  {type:"mcq", prompt:"A DBA partitions the Orders table by year so that queries run faster. Which schema has changed?", options:["Conceptual","Logical","Physical","None"], answer:2,
+   explain:"Partitioning changes how the data is stored and accessed, not what the data means or which tables exist. That is the physical schema."},
+  {type:"mcq", prompt:"What is a database schema?", options:[
+    "A blueprint that defines how the data is structured and organised","The data currently stored in the tables","A report generated from a query","A backup copy of the database"],
+   answer:0, explain:"A schema describes structure, not content. The data held at one moment is called the database instance."}
+]},
+{ id:"erd", table:"erd_relationships", title:"ERDs & Cardinality", codes:["A3.2.2"], attrs:["1:1 · 1:N · M:N","modality"], qs:[
+  {type:"sort", prompt:"Choose the cardinality of each relationship.", buckets:["1:1","1:N","M:N"], items:[
+    ["Employee — PersonnelRecord",0],["Country — Capital city",0],["Customer — Order",1],["Bank branch — Customer",1],["Student — Course",2],["Author — Book",2]],
+   explain:"Ask both directions: one customer places many orders, but each order belongs to one customer (1:N). A student takes many courses and a course has many students (M:N)."},
+  {type:"mcq", prompt:"How is a <b>many-to-many</b> relationship implemented in a relational database?", options:[
+    "With a junction (associative) table holding two foreign keys","By putting a list of IDs in one column","By merging both entities into one table","It cannot be implemented"],
+   answer:0, explain:"For Student–Course you add Enrolment(StudentID, CourseID), which splits M:N into two 1:N relationships. A list in one column would break 1NF."},
+  {type:"mcq", prompt:"A customer can exist in the database without ever placing an order. This describes the relationship's…", options:[
+    "optional modality (minimum 0)","mandatory modality (minimum 1)","one-to-one cardinality","composite key"],
+   answer:0, explain:"Modality (participation) says whether taking part is optional or mandatory. Optional means the minimum is 0."},
+  {type:"mcq", prompt:"Galaxy Bank: each branch has many customers, and each customer may take out a number of loans. Which ERD is correct?", options:[
+    "<code>BRANCH 1 ── N CUSTOMER 1 ── N LOAN</code>","<code>BRANCH N ── 1 CUSTOMER N ── 1 LOAN</code>","<code>BRANCH 1 ── 1 CUSTOMER 1 ── 1 LOAN</code>","<code>BRANCH M ── N LOAN</code>, no CUSTOMER entity"],
+   answer:0, explain:"One branch has many customers, one customer has many loans. Both are one-to-many, read from the branch outward."},
+  {type:"mcq", prompt:"In ERD notation, <code>0..*</code> means…", options:["zero or more","exactly zero","at least one","exactly one"], answer:0,
+   explain:"The first number is the minimum (modality), the second is the maximum (cardinality). <code>1..1</code> would mean exactly one."},
+  {type:"mcq", prompt:"When constructing an ERD, after identifying the entities and attributes, what is the next step?", options:[
+    "Identify the relationships between entities (using verbs)","Write the SQL CREATE TABLE statements","Choose index structures","Denormalise the tables"],
+   answer:0, explain:"The steps: choose the ERD level, identify entities and attributes, identify relationships (verbs such as \"places\", \"enrols in\"), then cardinality, then modality."}
+]},
+{ id:"typ", table:"data_types", title:"Data Types & Tables", codes:["A3.2.3","A3.2.4"], attrs:["INTEGER · VARCHAR","DECIMAL · DATE · BOOLEAN"], qs:[
+  {type:"mcq", prompt:"Choose the best data type for <code>Prod_Price</code> (values like 7.25).", options:TYPES, answer:2,
+   explain:"DECIMAL stores exact values with a fixed number of decimal places, which is what money needs. DECIMAL(6,2) allows up to 9999.99."},
+  {type:"mcq", prompt:"Choose the best data type for the <code>Name</code> column (values like \"Aruzhan Sadykova\").", options:TYPES, answer:1,
+   explain:"Names are text of varying length, so VARCHAR with a sensible maximum length is the right choice."},
+  {type:"mcq", prompt:"Choose the best data type for <code>JoinDate</code>.", options:TYPES, answer:3,
+   explain:"DATE lets the database validate dates, sort them chronologically and compare them (for example <code>JoinDate &lt; '2015-01-01'</code>)."},
+  {type:"mcq", prompt:"Choose the best data type for <code>IsMember</code> (yes/no).", options:TYPES, answer:4,
+   explain:"BOOLEAN stores only TRUE or FALSE, so no other values can slip in."},
+  {type:"mcq", prompt:"Choose the best data type for <code>School_phone_no</code> (values like +7 701 234 5678).", options:TYPES, answer:1,
+   explain:"Phone numbers are never used in arithmetic, and as an INTEGER the leading + or 0 would be lost. Store them as text."},
+  {type:"mcq", prompt:"Why is FLOAT a poor choice for financial data?", options:[
+    "Binary floating point cannot store some decimals exactly, so rounding errors build up","FLOAT cannot store negative numbers","FLOAT uses more storage than VARCHAR","FLOAT cannot be used in WHERE clauses"],
+   answer:0, explain:"0.1 has no exact binary representation, so repeated sums of money drift. DECIMAL stores exact decimal values."},
+  {type:"mcq", prompt:"Which is <b>not</b> a valid way to stop incorrect data entering <code>School_phone_no</code>?", options:[
+    "Storing it as FLOAT","A length check","A format (pattern) check","A presence check (NOT NULL)"],
+   answer:0, explain:"Length, format and presence checks are all validation. FLOAT would corrupt the number by dropping leading zeros and symbols."},
+  {type:"mcq", prompt:"What is lost when dates are stored as VARCHAR text?", options:[
+    "The database can no longer validate, sort or calculate with them correctly","Nothing; text is more flexible","The dates take up less storage","The values become read-only"],
+   answer:0, explain:"\"31/02/2025\" would be accepted, and \"10/01\" sorts before \"9/12\". The column loses its meaning as a date."}
+]},
+{ id:"nf", table:"normal_forms", title:"Normalisation", codes:["A3.2.5","A3.2.6"], attrs:["1NF · 2NF · 3NF","anomalies"], qs:[
+  {type:"mcq", prompt:"Which normal form is this table in? (PK: StudentID)",
+   table:T("Student",["StudentID","Name","Phones"],[[101,"Ali","8701 111 2233, 8777 444 5566"],[102,"Dana","8705 900 1122"]],{pk:[0]}),
+   options:NF, answer:0, explain:"<code>Phones</code> holds two values in one cell, so the data is not atomic. 1NF requires one value per field and no repeating groups."},
+  {type:"mcq", prompt:"Which normal form is this table in? (PK: StudentID + CourseID)",
+   table:T("Enrolment",["StudentID","CourseID","StudentName","Grade"],[[101,"CS1","Ali",6],[101,"MA2","Ali",5],[102,"CS1","Dana",7]],{pk:[0,1]}),
+   options:NF, answer:1, explain:"<code>StudentName</code> depends only on StudentID, which is part of the composite key. That is a partial dependency, so the table is not in 2NF."},
+  {type:"mcq", prompt:"Which normal form is this table in? (PK: EmpID)",
+   table:T("Employee",["EmpID","Name","DeptID","DeptName"],[["E1","Aigerim","D2","Finance"],["E2","Bolat","D2","Finance"],["E3","Saule","D5","IT"]],{pk:[0]}),
+   options:NF, answer:2, explain:"<code>DeptName</code> depends on <code>DeptID</code>, which is a non-key field. EmpID → DeptID → DeptName is a transitive dependency, so the table is not in 3NF."},
+  {type:"mcq", prompt:"Which normal form is this table in? (PK: OrderID)",
+   table:T("Orders",["OrderID","CustomerID","OrderDate"],[[5001,"C17","2026-02-11"],[5002,"C03","2026-02-11"]],{pk:[0],fk:[1]}),
+   options:NF, answer:3, explain:"Values are atomic, the key is a single field (no partial dependencies), and nothing depends on a non-key field."},
+  {type:"mcq", prompt:"What must be done to bring an unnormalised table into <b>1NF</b>?", options:[
+    "Make every value atomic, remove repeating groups and choose a primary key","Remove transitive dependencies","Split off fields that depend on part of a composite key","Add indexes to every column"],
+   answer:0, explain:"1NF is about atomic values, no repeating groups and a unique identifier. Partial dependencies are 2NF; transitive dependencies are 3NF."},
+  {type:"mcq", prompt:"What is the difference between 2NF and 3NF?", options:[
+    "2NF removes partial dependencies on part of a composite key; 3NF removes transitive dependencies between non-key fields","2NF makes values atomic; 3NF adds a primary key","2NF is for small tables; 3NF is for large ones","There is no difference when the key is composite"],
+   answer:0, explain:"In 2NF every non-key field depends on the whole key. In 3NF it also depends on nothing but the key."},
+  {type:"mcq", prompt:"Normalise <code>OrderLine(OrderID, ProdID, Prod_Name, Prod_Price, SupID, Sup_Name, Qty)</code> to 3NF. Underlined fields are keys.", options:[
+    "<code>OrderLine(<u>OrderID</u>, <u>ProdID</u>, Qty)</code><br><code>Product(<u>ProdID</u>, Prod_Name, Prod_Price, SupID)</code><br><code>Supplier(<u>SupID</u>, Sup_Name)</code>",
+    "<code>OrderLine(<u>OrderID</u>, <u>ProdID</u>, Qty)</code><br><code>Product(<u>ProdID</u>, Prod_Name, Prod_Price, SupID, Sup_Name)</code>",
+    "<code>OrderLine(<u>OrderID</u>, ProdID, Qty, Sup_Name)</code><br><code>Product(<u>ProdID</u>, Prod_Name, Prod_Price)</code>",
+    "<code>OrderLine(<u>LineID</u>, OrderID, ProdID, Prod_Name, Prod_Price, SupID, Sup_Name, Qty)</code>"],
+   answer:0, explain:"Product details depend only on ProdID (partial dependency → own table). Sup_Name depends on SupID, not on ProdID (transitive → own table). Only Qty depends on the full key."},
+  {type:"mcq", prompt:"\"Mr Smith\" is stored in 40 rows. When his name changes, one row is missed and the data now disagrees. This is an…", options:[
+    "update anomaly","insertion anomaly","deletion anomaly","integrity constraint"],
+   answer:0, explain:"Redundant copies must all be updated together. Normalisation stores each fact once, so the change happens in one place."}
+]},
+{ id:"den", table:"denormalisation", title:"Denormalisation", codes:["A3.2.7"], attrs:["read speed","redundancy risk"], qs:[
+  {type:"sort", prompt:"For each system, would you keep it normalised or denormalise it?", buckets:["Normalise","Denormalise"], items:[
+    ["Bank transfers between accounts",0],["Hospital patient records, updated many times a day",0],["Exam registration with constant inserts and edits",0],
+    ["Sales dashboard that is only read for reports",1],["Social feed showing the author's name on every post, read millions of times",1],["Product pages read far more often than they change",1]],
+   explain:"Write-heavy systems where accuracy matters stay normalised. Read-heavy systems such as reports, feeds and catalogues gain from fewer joins."},
+  {type:"mcq", prompt:"\"The sales report takes 12 seconds. The store database is fully normalised (3NF) and mostly read.\" What is the best first step?", options:[
+    "Denormalise the reporting data, e.g. a summary table storing customer name and region with each sale","Normalise further, to 4NF","Delete old orders","Change every VARCHAR column to TEXT"],
+   answer:0, explain:"The report is slow because it joins many tables. Pre-joining or pre-aggregating the data for reports removes those joins."},
+  {type:"mcq", prompt:"What is the main <b>risk</b> of denormalisation?", options:[
+    "Duplicated data can become inconsistent (update anomalies)","Reads become slower","Queries need more joins","Primary keys stop working"],
+   answer:0, explain:"The same fact is now stored in several places. Every INSERT, UPDATE and DELETE must keep all copies in step."},
+  {type:"mcq", prompt:"Denormalisation is best described as…", options:[
+    "intentionally reintroducing redundancy to make reads faster and queries simpler","a mistake made when a database is designed badly","removing all foreign keys","converting a table to 1NF"],
+   answer:0, explain:"It is a deliberate trade-off: some integrity and storage for read performance."},
+  {type:"mcq", prompt:"Which is an <b>advantage of normalisation</b>?", options:[
+    "Each fact is stored once, so updates happen in one place","Reports need fewer joins","Data is duplicated for caching","Write operations touch more tables"],
+   answer:0, explain:"Normalisation gives integrity, less redundancy and efficient updates. Fewer joins is an advantage of denormalisation."}
+]},
+{ id:"sql", table:"sql_lab", title:"SQL Lab", codes:["A3.3.1","A3.3.2","A3.3.3"], attrs:["DDL · DML","SELECT · JOIN","INSERT · UPDATE · DELETE"], qs:[
+  {type:"sort", prompt:"Is each command part of the Data Definition Language or the Data Manipulation Language?", buckets:["DDL","DML"], items:[
+    ["CREATE TABLE",0],["ALTER TABLE",0],["DROP TABLE",0],["SELECT",1],["INSERT",1],["UPDATE",1],["DELETE",1]],
+   explain:"DDL defines and changes the structure (tables, fields, constraints). DML works with the data inside those tables."},
+  {type:"mcq", prompt:"Outline the purpose of a data definition language (DDL).", options:[
+    "To define and modify the database structure: tables, fields, data types and constraints","To retrieve and change the records stored in tables","To grant users permissions","To back up the database"],
+   answer:0, explain:"For full marks: DDL creates and modifies the schema (CREATE, ALTER, DROP), while DML handles the data itself."},
+  {type:"build", prompt:"List the <b>IDs</b> of all users who have a <b>Gold</b> subscription.", tables:[USERS],
+   tiles:["SELECT","ID","FROM","Users","WHERE","Subscription = 'Gold'","*","Subscription == Gold","ORDER BY"],
+   answers:[["SELECT","ID","FROM","Users","WHERE","Subscription = 'Gold'"]],
+   result:T("Result",["ID"],[[1],[4]]),
+   explain:"SELECT chooses columns, FROM chooses the table, WHERE filters rows. Text values go in single quotes and SQL compares with a single <code>=</code>."},
+  {type:"build", prompt:"It is 2025. List <b>all records</b> of users who have used the service for <b>more than 10 years</b>.", tables:[USERS],
+   tiles:["SELECT","*","FROM","Users","WHERE","JoinDate < '2015-01-01'","JoinDate > '2015-01-01'","Name","ORDER BY"],
+   answers:[["SELECT","*","FROM","Users","WHERE","JoinDate < '2015-01-01'"]],
+   result:T("Result",USERS.cols,USERS.rows.filter(r=>r[3]<"2015-01-01")),
+   explain:"<code>*</code> returns every column. An earlier date is a smaller value, so joining before 2015 means <code>JoinDate &lt; '2015-01-01'</code>."},
+  {type:"build", prompt:"List the <b>names</b> of all users ordered by join date, <b>earliest first</b>.", tables:[USERS],
+   tiles:["SELECT","Name","FROM","Users","ORDER BY","JoinDate","ASC","DESC","WHERE","GROUP BY"],
+   answers:[["SELECT","Name","FROM","Users","ORDER BY","JoinDate","ASC"],["SELECT","Name","FROM","Users","ORDER BY","JoinDate"]],
+   result:T("Result",["Name"],[...USERS.rows].sort((a,b)=>a[3]<b[3]?-1:1).map(r=>[r[1]])),
+   explain:"ORDER BY sorts the output; ASC (ascending) is the default and puts the oldest date first. DESC would start with the newest."},
+  {type:"build", prompt:"Output the names of all products supplied by <b>Veggy Co.</b> with prices from <b>4.00 to 10.00 inclusive</b>. You need both tables.", tables:[PRODUCTS,SUPPLIERS],
+   tiles:["SELECT","Products.ProdName","FROM","Products","JOIN","Suppliers","ON Products.SupID = Suppliers.SupID","WHERE","Suppliers.SupName = 'Veggy Co.'","AND","Products.Price BETWEEN 4.00 AND 10.00","Products.Price > 4.00 AND Products.Price < 10.00","OR"],
+   answers:[["SELECT","Products.ProdName","FROM","Products","JOIN","Suppliers","ON Products.SupID = Suppliers.SupID","WHERE","Suppliers.SupName = 'Veggy Co.'","AND","Products.Price BETWEEN 4.00 AND 10.00"],
+            ["SELECT","Products.ProdName","FROM","Products","JOIN","Suppliers","ON Products.SupID = Suppliers.SupID","WHERE","Products.Price BETWEEN 4.00 AND 10.00","AND","Suppliers.SupName = 'Veggy Co.'"]],
+   result:T("Result",["ProdName"],[["Tomatoes"],["Peppers"],["Avocado"]]),
+   explain:"JOIN … ON matches each product to its supplier through the foreign key. BETWEEN is inclusive, so 4.00 and 10.00 are kept; <code>&gt;</code> and <code>&lt;</code> would wrongly drop Tomatoes and Avocado."},
+  {type:"build", prompt:"Add a new <b>black</b> car with licence plate <b>84630</b>, made by <b>DriveX</b>, using DriveX's existing Brand ID and owner.", tables:[CARS],
+   tiles:["INSERT INTO","Cars","VALUES","('84630', 'Black', 2, 'DriveX', 'Amir Sadykov')","('84630', 'Black', 1, 'DriveX', 'Yifan Zhao')","UPDATE","SET"],
+   answers:[["INSERT INTO","Cars","VALUES","('84630', 'Black', 2, 'DriveX', 'Amir Sadykov')"]],
+   result:T("Cars",CARS.cols,[...CARS.rows,["84630","Black",2,"DriveX","Amir Sadykov"]],{hl:[3]}),
+   explain:"INSERT INTO adds a new row. The values follow the column order, and BID and BOwner must match DriveX's existing rows (2, Amir Sadykov) to keep the data consistent."},
+  {type:"build", prompt:"Mira (ID 3) upgrades to <b>Gold</b>. Update only her record.", tables:[USERS],
+   tiles:["UPDATE","Users","SET","Subscription = 'Gold'","WHERE","ID = 3","INSERT INTO","Subscription == 'Gold'","FROM"],
+   answers:[["UPDATE","Users","SET","Subscription = 'Gold'","WHERE","ID = 3"]],
+   result:T("Users",USERS.cols,USERS.rows.map(r=>r[0]===3?[3,"Mira","Gold",r[3]]:r),{hl:[2]}),
+   explain:"UPDATE … SET changes values in existing rows. Without WHERE, every user would become Gold."},
+  {type:"build", prompt:"Remove every user with a <b>Bronze</b> subscription.", tables:[USERS],
+   tiles:["DELETE","FROM","Users","WHERE","Subscription = 'Bronze'","DROP TABLE","*","SELECT"],
+   answers:[["DELETE","FROM","Users","WHERE","Subscription = 'Bronze'"]],
+   result:T("Users",USERS.cols,USERS.rows.filter(r=>r[2]!=="Bronze")),
+   explain:"DELETE FROM removes rows that match WHERE. DROP TABLE is DDL and would delete the whole table, structure included."}
+]}
+];
+
+const FINAL = {id:"final", table:"final_exam", title:"Final Exam", codes:["A3"], attrs:["10 random rounds from every station"], final:true};
+
+/* ---------- state ---------- */
+let save = {};
+try{ save = JSON.parse(localStorage.getItem("keyquest-a3")||"{}") || {} }catch(e){ save = {} }
+function persist(){ try{ localStorage.setItem("keyquest-a3", JSON.stringify(save)) }catch(e){} }
+let S = null;
+const app = document.getElementById("app");
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]} return a };
+const esc = s => String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const keyIcon = cls => `<svg class="${cls||""}" aria-hidden="true"><use href="#key"/></svg>`;
+const starStr = n => [0,1,2].map(i=>`<span class="${i<n?"on":""}">★</span>`).join("");
+
+/* ---------- map ---------- */
+function totals(){
+  let stars=0, score=0;
+  [...STATIONS,FINAL].forEach(s=>{const r=save[s.id]; if(r){stars+=r.stars||0; score+=r.score||0}});
+  return {stars, score};
+}
+function renderMap(){
+  const t = totals();
+  const card = (s,i) => {
+    const r = save[s.id]||{};
+    const n = s.final ? 10 : s.qs.length;
+    return `<button class="entity ${s.final?"final":""}" data-i="${i}">
+      <div class="eh"><span>${s.table}</span><span>${s.codes.join(" · ")}</span></div>
+      <div class="eb"><h3>${s.title}</h3>
+        ${s.attrs.map((a,k)=>`<div class="attr"><span class="k">${k===0?"PK":"·"}</span>${a}</div>`).join("")}
+      </div>
+      <div class="ef"><span class="label">${n} rounds${r.score?` · best ${r.score}`:""}</span><span class="stars">${starStr(r.stars||0)}</span></div>
+    </button>`;
+  };
+  app.innerHTML = `
+    <header class="top">
+      <div class="brand">
+        <h1>${keyIcon()}KEY QUEST</h1>
+        <p>A3 Databases, IB Computer Science. Clear each station to earn stars. You have three keys per station; a wrong answer costs one.</p>
+      </div>
+      <div class="totals">
+        <div class="stat"><span class="label">Stars</span><b>${t.stars}/${(STATIONS.length+1)*3}</b></div>
+        <div class="stat"><span class="label">Best total</span><b>${t.score}</b></div>
+      </div>
+    </header>
+    <section class="map">${STATIONS.map(card).join("")}${card(FINAL,STATIONS.length)}</section>
+    <div class="map-foot"><span>Topics: relational databases, schemas, ERDs, data types, 1NF–3NF, denormalisation, SQL.</span>
+      <button class="linkbtn" id="reset">Reset progress</button></div>`;
+  app.querySelectorAll(".entity").forEach(b=>b.onclick=()=>start(+b.dataset.i));
+  const rb = document.getElementById("reset");
+  rb.onclick = () => {
+    if(rb.dataset.armed){ save={}; persist(); renderMap(); }
+    else { rb.dataset.armed="1"; rb.textContent="Click again to erase all stars"; }
+  };
+}
+
+/* ---------- play ---------- */
+function start(i){
+  const st = i < STATIONS.length ? STATIONS[i] : FINAL;
+  const qs = st.final ? shuffle(STATIONS.flatMap(s=>s.qs)).slice(0,10) : st.qs;
+  S = {i, st, qs, k:0, hearts:3, score:0, streak:0, mistakes:0, log:[]};
+  renderQ();
+  window.scrollTo({top:0});
+}
+function hud(){
+  return `<div class="hud">
+    <button class="back" id="back">← Map</button>
+    <div class="title">${S.st.title}</div>
+    <div class="streak">${S.streak>1?`streak ×${S.streak}`:""}</div>
+    <div class="keys" title="${S.hearts} keys left">${[0,1,2].map(n=>keyIcon(n<S.hearts?"":"lost")).join("")}</div>
+    <div class="score">${S.score}</div>
+  </div>
+  <div class="pips">${S.qs.map((_,n)=>`<i class="${S.log[n]===true?"ok":S.log[n]===false?"bad":n===S.k?"cur":""}"></i>`).join("")}</div>`;
+}
+function tableHTML(t, opts={}){
+  const pk=t.pk||[], fk=t.fk||[], hl=t.hl||[];
+  return `<div class="tblwrap"><div class="tbl ${opts.pick?"pickable":""}"><div class="tn">${esc(t.name)}</div><table>
+    <thead><tr>${t.cols.map((c,j)=>`<th data-c="${j}">${esc(c)}${!opts.pick&&pk.includes(j)?'<span class="tag">PK</span>':""}${!opts.pick&&fk.includes(j)?'<span class="tag">FK</span>':""}</th>`).join("")}</tr></thead>
+    <tbody>${t.rows.map((r,ri)=>`<tr class="${hl.includes(ri)?"hl":""}">${r.map((v,j)=>`<td data-c="${j}">${esc(v)}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table></div></div>`;
+}
+function renderQ(){
+  const q = S.qs[S.k];
+  const kind = {mcq:"Choose one",pick:q.answer&&q.answer.length>1?"Select columns":"Click a column",sort:"Sort",build:"Build the query"}[q.type];
+  app.innerHTML = `${hud()}
+    <article class="card" id="card">
+      <div class="qmeta"><span class="label">Round ${S.k+1} of ${S.qs.length}</span><span class="label">${kind}</span></div>
+      <div class="prompt">${q.prompt}</div>
+      <div id="body"></div>
+      <div id="fb"></div>
+    </article>`;
+  document.getElementById("back").onclick = renderMap;
+  const body = document.getElementById("body");
+  ({mcq:doMCQ, pick:doPick, sort:doSort, build:doBuild})[q.type](q, body);
+}
+
+function doMCQ(q, body){
+  const order = shuffle(q.options.map((_,i)=>i));
+  body.innerHTML = `${q.table?`<div class="tables" style="margin-bottom:16px">${tableHTML(q.table)}</div>`:""}
+    <div class="opts">${order.map((oi,n)=>`<button class="opt" data-o="${oi}"><span class="n">${n+1}</span><span>${q.options[oi]}</span></button>`).join("")}</div>`;
+  const btns = [...body.querySelectorAll(".opt")];
+  btns.forEach(b=>b.onclick=()=>{
+    const o=+b.dataset.o, ok=o===q.answer;
+    btns.forEach(x=>{x.disabled=true; if(+x.dataset.o===q.answer) x.classList.add("right")});
+    if(!ok) b.classList.add("wrong");
+    resolve(ok, q.explain);
+  });
+}
+
+function doPick(q, body){
+  const multi = q.answer.length>1, sel = new Set();
+  body.innerHTML = `<div class="tables">${tableHTML(q.table,{pick:true})}</div>
+    ${multi?`<div class="actions" style="margin-top:14px"><button class="btn" id="chk" disabled>Check</button><span class="label" id="cnt">0 of ${q.answer.length} selected</span></div>`:""}`;
+  const cells = c => body.querySelectorAll(`[data-c="${c}"]`);
+  let done=false;
+  const paint = () => q.table.cols.forEach((_,c)=>cells(c).forEach(el=>el.classList.toggle("colsel",sel.has(c))));
+  const check = () => {
+    done=true;
+    const ok = sel.size===q.answer.length && q.answer.every(a=>sel.has(a));
+    q.table.cols.forEach((_,c)=>cells(c).forEach(el=>{el.classList.remove("colsel","colhov");
+      if(q.answer.includes(c)) el.classList.add("colok"); else if(sel.has(c)) el.classList.add("colbad");}));
+    const b=document.getElementById("chk"); if(b) b.disabled=true;
+    resolve(ok, q.explain);
+  };
+  body.querySelectorAll("[data-c]").forEach(el=>{
+    const c=+el.dataset.c;
+    el.onmouseenter=()=>{ if(!done) cells(c).forEach(x=>x.classList.add("colhov")) };
+    el.onmouseleave=()=>cells(c).forEach(x=>x.classList.remove("colhov"));
+    el.onclick=()=>{
+      if(done) return;
+      if(!multi){ sel.add(c); check(); return; }
+      sel.has(c)?sel.delete(c):sel.add(c); paint();
+      document.getElementById("cnt").textContent=`${sel.size} of ${q.answer.length} selected`;
+      document.getElementById("chk").disabled = sel.size!==q.answer.length;
+    };
+  });
+  if(multi) document.getElementById("chk").onclick=check;
+}
+
+function doSort(q, body){
+  const items = shuffle(q.items.map((it,i)=>({text:it[0], b:it[1], i})));
+  const pick = {};
+  body.innerHTML = `<div class="sortlist">${items.map(it=>`
+    <div class="srow" data-i="${it.i}"><span class="txt">${esc(it.text)}</span>
+      <div class="seg">${q.buckets.map((bk,bi)=>`<button data-b="${bi}">${esc(bk)}</button>`).join("")}</div></div>`).join("")}</div>
+    <div class="actions" style="margin-top:14px"><button class="btn" id="chk" disabled>Check</button><span class="label" id="cnt">0 of ${items.length} sorted</span></div>`;
+  body.querySelectorAll(".srow").forEach(row=>{
+    const i=+row.dataset.i;
+    row.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{
+      pick[i]=+b.dataset.b;
+      row.querySelectorAll(".seg button").forEach(x=>x.classList.toggle("on",x===b));
+      const n=Object.keys(pick).length;
+      document.getElementById("cnt").textContent=`${n} of ${items.length} sorted`;
+      document.getElementById("chk").disabled = n<items.length;
+    });
+  });
+  document.getElementById("chk").onclick=()=>{
+    let wrong=0;
+    body.querySelectorAll(".srow").forEach(row=>{
+      const i=+row.dataset.i, right=q.items[i][1], ok=pick[i]===right;
+      row.classList.add(ok?"right":"wrong");
+      row.querySelectorAll("button").forEach(b=>b.disabled=true);
+      if(!ok){ wrong++; row.insertAdjacentHTML("beforeend",`<span class="fix">→ ${esc(q.buckets[right])}</span>`) }
+    });
+    document.getElementById("chk").disabled=true;
+    resolve(wrong===0, (wrong?`<b>${wrong} of ${items.length} misplaced.</b> `:"")+q.explain);
+  };
+}
+
+const KW = /^(SELECT|FROM|WHERE|AND|OR|JOIN|ORDER BY|GROUP BY|ASC|DESC|INSERT INTO|VALUES|UPDATE|SET|DELETE|DROP TABLE)$/;
+function doBuild(q, body){
+  const pool = shuffle(q.tiles.map((t,id)=>({t,id})));
+  let line = [];
+  body.innerHTML = `<div class="tables">${q.tables.map(t=>tableHTML(t)).join("")}</div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-top:18px">
+      <span class="label">Your query</span>
+      <div class="sql-line" id="line"></div>
+      <span class="label">Tiles (not all are needed)</span>
+      <div class="pool" id="pool"></div>
+      <div class="actions"><button class="btn" id="run" disabled>Run query</button><button class="btn ghost" id="clr">Clear</button></div>
+    </div>`;
+  const tile = p => `<button class="tile ${KW.test(p.t)?"kw":""}" data-id="${p.id}">${esc(p.t)}</button>`;
+  const draw = () => {
+    const L=document.getElementById("line"), P=document.getElementById("pool");
+    L.innerHTML = line.map(id=>tile(pool.find(p=>p.id===id))).join("");
+    P.innerHTML = pool.filter(p=>!line.includes(p.id)).map(tile).join("");
+    L.querySelectorAll(".tile").forEach(b=>b.onclick=()=>{line=line.filter(x=>x!==+b.dataset.id);draw()});
+    P.querySelectorAll(".tile").forEach(b=>b.onclick=()=>{line.push(+b.dataset.id);draw()});
+    document.getElementById("run").disabled = !line.length;
+  };
+  draw();
+  document.getElementById("clr").onclick=()=>{line=[];draw()};
+  document.getElementById("run").onclick=()=>{
+    const got = line.map(id=>q.tiles[id]).join("§");
+    const ok = q.answers.some(a=>a.join("§")===got);
+    body.querySelectorAll("button").forEach(b=>b.disabled=true);
+    const sql = q.answers[0].join(" ")+";";
+    resolve(ok, q.explain, ok
+      ? `<span class="label">Output</span><div class="tables">${tableHTML(q.result)}</div>`
+      : `<span class="label">Correct query</span><div class="answer">${esc(sql)}</div>`);
+  };
+}
+
+function resolve(ok, explain, extra=""){
+  S.log[S.k]=ok;
+  let gain=0;
+  if(ok){ S.streak++; gain = 100 + Math.min(S.streak-1,5)*20; S.score+=gain; }
+  else { S.streak=0; S.hearts--; S.mistakes++; }
+  // refresh hud without rebuilding the card
+  const card=document.getElementById("card");
+  const tmp=document.createElement("div"); tmp.innerHTML=hud();
+  app.querySelector(".hud").replaceWith(tmp.children[0]);
+  app.querySelector(".pips").replaceWith(tmp.children[0]);
+  document.getElementById("back").onclick = renderMap;
+  if(!ok){ card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake"); }
+  const last = S.k===S.qs.length-1 || S.hearts===0;
+  document.getElementById("fb").innerHTML = `<div class="fb ${ok?"":"bad"}">
+    <h3>${ok?`Correct · +${gain}`:(S.hearts?"Not quite · one key lost":"Out of keys")}</h3>
+    <p class="explain">${explain}</p>${extra}
+    <div class="actions"><button class="btn" id="next">${last?"See results":"Next round →"}</button></div></div>`;
+  const nx=document.getElementById("next"); nx.focus({preventScroll:true});
+  document.getElementById("fb").scrollIntoView({behavior:"smooth",block:"nearest"});
+  nx.onclick=()=>{ if(last) finish(); else { S.k++; renderQ(); } };
+}
+
+function finish(){
+  const passed = S.hearts>0;
+  const stars = passed ? Math.max(1, 3-S.mistakes) : 0;
+  const r = save[S.st.id]||{};
+  if(passed){ save[S.st.id] = {stars:Math.max(stars,r.stars||0), score:Math.max(S.score,r.score||0)}; persist(); }
+  const right = S.log.filter(x=>x===true).length;
+  app.innerHTML = `${hud()}
+    <article class="card end">
+      <span class="label">${S.st.table} · ${passed?"station cleared":"station locked"}</span>
+      <div class="big">${S.score}</div>
+      <div class="stars">${starStr(stars)}</div>
+      <p>${passed
+        ? `${right} of ${S.qs.length} rounds correct. ${stars===3?"A perfect run.":"Replay with no mistakes to earn all three stars."}`
+        : `You ran out of keys after ${S.log.length} rounds. Read the explanations, then try again.`}</p>
+      <div class="actions" style="justify-content:center"><button class="btn" id="again">Play again</button><button class="btn ghost" id="tomap">Back to map</button></div>
+    </article>`;
+  document.getElementById("back").onclick = renderMap;
+  document.getElementById("again").onclick=()=>start(S.i);
+  document.getElementById("tomap").onclick=renderMap;
+}
+
+document.addEventListener("keydown",e=>{
+  if(!S || !document.querySelector(".opt")) return;
+  const n=parseInt(e.key,10);
+  if(n>=1&&n<=9){ const b=document.querySelectorAll(".opt")[n-1]; if(b&&!b.disabled) b.click(); }
+});
+renderMap();
+</script>
+
+</body>
+</html>
