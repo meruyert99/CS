@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}[hidden]{display:none!important}</style>
+<title>SQL Lesson 2 Revision</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+/* Layout: one working column — table reference, then code lines with blanks, keyword bank pinned below on phones */
+:root{
+  --bg:#F3F6F8; --panel:#FFFFFF; --ink:#1A1A1A; --muted:#5E7080; --slate:#4E6E81;
+  --blue:#5170FF; --red:#D84B2F; --ok:#188038; --okbg:#DDF0E1; --badbg:#FBE0D9; --line:#D7DFE5; --chip:#E3E9FF;
+  --display:"Archivo",Arial,sans-serif; --mono:"JetBrains Mono","Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14191D; --panel:#1E252B; --ink:#E8EDF0; --muted:#9AAAB6; --slate:#7FA2B6;
+  --blue:#8DA0FF; --red:#FF8A6E; --ok:#6FD08C; --okbg:#1E3A27; --badbg:#46241D; --line:#33404A; --chip:#2A3360; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14191D; --panel:#1E252B; --ink:#E8EDF0; --muted:#9AAAB6; --slate:#7FA2B6;
+  --blue:#8DA0FF; --red:#FF8A6E; --ok:#6FD08C; --okbg:#1E3A27; --badbg:#46241D; --line:#33404A; --chip:#2A3360; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--display);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 40px}
+.wrap{max-width:980px;margin:0 auto;display:grid;gap:22px}
+header{display:grid;gap:6px}
+.eyebrow{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--slate);font-weight:700}
+h1{font-size:clamp(28px,5vw,42px);font-weight:800;margin:0;text-wrap:balance}
+.lead{color:var(--muted);font-size:16px;margin:0;max-width:62ch;line-height:1.5}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+@media (max-width:820px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0}
+.label{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:10px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;width:100%}
+th{background:var(--slate);color:#fff;text-align:left;padding:7px 10px;font-weight:700}
+td{padding:6px 10px;border-bottom:1px solid var(--line)}
+ol{list-style:none;margin:0;padding:0;display:grid;gap:10px;counter-reset:q}
+li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;align-items:start;padding:12px;border-radius:10px;border:1px solid var(--line);counter-increment:q}
+li::before{content:counter(q);font-weight:800;color:var(--red);font-size:18px;line-height:34px}
+.task{font-size:14px;color:var(--muted);margin-bottom:6px}
+.code{font-family:var(--mono);font-size:15px;line-height:2.1;overflow-wrap:anywhere}
+.gap{display:inline-block;min-width:92px;height:30px;line-height:26px;vertical-align:middle;text-align:center;border:2px dashed var(--line);border-radius:8px;
+  font-family:var(--mono);font-weight:700;color:var(--blue);background:transparent;cursor:pointer;padding:0 8px;font-size:15px}
+.gap.active{border-color:var(--blue);border-style:solid;box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 25%,transparent)}
+.gap.filled{border-style:solid;background:var(--chip)}
+.gap.ok{background:var(--okbg);border-color:var(--ok);color:var(--ok)}
+.gap.bad{background:var(--badbg);border-color:var(--red);color:var(--red)}
+.gap:focus-visible,.chip:focus-visible,button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.bank{position:sticky;top:max(12px,env(safe-area-inset-top,0px))}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-weight:700;font-size:14px;padding:8px 12px;border-radius:999px;border:1px solid var(--blue);background:var(--chip);color:var(--ink);cursor:pointer}
+.chip:hover{background:var(--blue);color:#fff}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+button.main{font-family:var(--display);font-weight:700;font-size:15px;padding:10px 18px;border-radius:10px;border:0;background:var(--slate);color:#fff;cursor:pointer}
+button.ghost{font-family:var(--display);font-weight:700;font-size:15px;padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.score{margin-top:14px;font-size:15px;line-height:1.5;min-height:1.5em}
+.score b{font-size:22px}
+.hint{font-size:13px;color:var(--muted);line-height:1.5;margin-top:12px}
+@media (max-width:820px){.bank{position:static}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Grade 10 ICT · Lesson 2 revision · DDL and DML</div>
+    <h1>Complete the SQL commands</h1>
+    <p class="lead">Choose a gap, then tap a keyword. Tap a filled gap to clear it. Some keywords are extra. Press Check when every gap is filled.</p>
+  </header>
+
+  <div class="grid">
+    <div style="display:grid;gap:22px;min-width:0">
+      <section class="panel">
+        <div class="label">Table: Users</div>
+        <div class="tbl"><table>
+          <tr><th>id</th><th>username</th><th>grade</th><th>followers</th></tr>
+          <tr><td>1</td><td>aruzhan</td><td>10A</td><td>90</td></tr>
+          <tr><td>2</td><td>dana</td><td>10B</td><td>150</td></tr>
+          <tr><td>3</td><td>ali</td><td>10A</td><td>240</td></tr>
+          <tr><td>4</td><td>timur</td><td>10C</td><td>60</td></tr>
+        </table></div>
+      </section>
+      <section class="panel">
+        <div class="label">Commands</div>
+        <ol id="list"></ol>
+      </section>
+    </div>
+
+    <aside class="panel bank" aria-label="Keywords">
+      <div class="label">Keywords</div>
+      <div class="chips" id="chips"></div>
+      <div class="actions">
+        <button class="main" id="check" type="button">Check</button>
+        <button class="ghost" id="reset" type="button">Start again</button>
+      </div>
+      <div class="score" id="score" aria-live="polite"></div>
+      <p class="hint">Shelf (DDL): ALTER, DROP. Stuff (DML): SELECT, INSERT, UPDATE, DELETE.</p>
+    </aside>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  {task:"Show username and followers of all users.", code:"[SELECT] username, followers [FROM] Users;"},
+  {task:"Show the users from 10A.", code:"SELECT * FROM Users [WHERE] grade = '10A';"},
+  {task:"Show all users, most followers first.", code:"SELECT * FROM Users [ORDER] BY followers [DESC];"},
+  {task:"Show every grade only once.", code:"SELECT [DISTINCT] grade FROM Users;"},
+  {task:"Users from 10A with more than 100 followers.", code:"SELECT username FROM Users WHERE grade = '10A' [AND] followers > 100;"},
+  {task:"Add a new user kamila.", code:"[INSERT] INTO Users (id, username, grade, followers) [VALUES] (5, 'kamila', '10B', 0);"},
+  {task:"Aruzhan now has 100 followers.", code:"[UPDATE] Users [SET] followers = 100 WHERE username = 'aruzhan';"},
+  {task:"Timur deletes his account.", code:"[DELETE] FROM Users WHERE username = 'timur';"},
+  {task:"The app adds a new column bio.", code:"[ALTER] TABLE Users ADD bio TEXT;"},
+  {task:"The app removes the whole table Stories.", code:"[DROP] TABLE Stories;"}
+];
+const EXTRA = ["OR","ASC","CREATE","INTO"];
+const list = document.getElementById("list");
+const chipsEl = document.getElementById("chips");
+const scoreEl = document.getElementById("score");
+let gaps = [], active = null;
+
+function esc(s){return s.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function build(){
+  list.innerHTML = ""; gaps = [];
+  ITEMS.forEach((it, i) => {
+    const li = document.createElement("li");
+    const body = document.createElement("div");
+    body.innerHTML = `<div class="task">${esc(it.task)}</div>`;
+    const code = document.createElement("div"); code.className = "code";
+    it.code.split(/(\[[A-Z]+\])/).forEach(part => {
+      const m = part.match(/^\[([A-Z]+)\]$/);
+      if (m){
+        const g = document.createElement("button");
+        g.type = "button"; g.className = "gap"; g.dataset.answer = m[1]; g.id = "gap" + gaps.length;
+        g.setAttribute("aria-label", "gap " + (gaps.length + 1));
+        g.addEventListener("click", () => onGap(g));
+        gaps.push(g); code.appendChild(g);
+      } else code.appendChild(document.createTextNode(part));
+    });
+    body.appendChild(code); li.appendChild(body); list.appendChild(li);
+  });
+  const words = [...new Set(gaps.map(g => g.dataset.answer).concat(EXTRA))].sort();
+  chipsEl.innerHTML = "";
+  words.forEach(w => {
+    const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = w;
+    c.addEventListener("click", () => place(w)); chipsEl.appendChild(c);
+  });
+  setActive(gaps[0]); scoreEl.textContent = "";
+}
+function setActive(g){
+  gaps.forEach(x => x.classList.remove("active"));
+  active = g || null; if (active) active.classList.add("active");
+}
+function onGap(g){
+  if (g.textContent){ g.textContent = ""; g.classList.remove("filled","ok","bad"); }
+  setActive(g);
+}
+function place(w){
+  if (!active) active = gaps.find(g => !g.textContent);
+  if (!active) return;
+  active.textContent = w; active.classList.add("filled"); active.classList.remove("ok","bad");
+  setActive(gaps.find(g => !g.textContent));
+}
+document.getElementById("check").addEventListener("click", () => {
+  let ok = 0, empty = 0;
+  gaps.forEach(g => {
+    g.classList.remove("ok","bad");
+    if (!g.textContent){ empty++; return; }
+    if (g.textContent === g.dataset.answer){ g.classList.add("ok"); ok++; } else g.classList.add("bad");
+  });
+  scoreEl.innerHTML = `<b>${ok} / ${gaps.length}</b> correct` + (empty ? ` · ${empty} gaps still empty` : "") +
+    (ok === gaps.length ? "<br>All commands are correct. Well done!" : "<br>Red gaps are wrong: tap them and choose again.");
+});
+document.getElementById("reset").addEventListener("click", build);
+build();
+</script>
+</body>
+</html>
