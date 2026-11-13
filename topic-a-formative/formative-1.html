@@ -1,0 +1,514 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Signal Quest 1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: sticky status bar + journey track (avatar moves one step per correct answer toward the goal); one task card below. */
+/* Light arcade: pixel city backdrop, pixel display face for labels, readable Rubik for questions; one deliberate light look. */
+:root{
+  --bg:#EAF0FF; --surface:#FFFFFF; --raised:#F7F8FF; --ink:#1A1433; --muted:#585274; --line:#CFC8EC; --shadow:#2A2150;
+  --accent:#3EC6F0; --on-accent:#1A1433; --good:#137A45; --good-bg:#DDF7E8; --warn:#8A6100; --warn-bg:#FFF1C7; --bad:#C2283A; --bad-bg:#FFE1E5;
+  --display:'Press Start 2P', 'Courier New', monospace; --body:'Rubik', Arial, sans-serif; --mono:'JetBrains Mono', 'Courier New', monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;
+  background-image:radial-gradient(var(--line) 1px, transparent 1px);background-size:22px 22px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.bar-in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:16px;padding-block:10px 4px;flex-wrap:wrap}
+.brand{font-family:var(--display);font-weight:700;font-size:18px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand span{color:var(--accent)}
+.stat{font-family:var(--mono);font-size:14px;display:flex;gap:6px;align-items:baseline;font-variant-numeric:tabular-nums}
+.stat b{font-weight:600;font-size:16px}
+.stat small{color:var(--muted);font-family:var(--body);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+/* journey */
+.journey{max-width:860px;margin:0 auto;padding:8px 0 12px}
+.track{position:relative;height:64px;margin:0 18px}
+.track .line{position:absolute;left:0;right:0;top:22px;height:4px;border-radius:2px;background:var(--line)}
+.track .fill{position:absolute;left:0;top:22px;height:4px;border-radius:2px;background:var(--accent);transition:width .6s ease}
+.step{position:absolute;top:20px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--line)}
+.step.g{background:var(--good)} .step.a{background:var(--warn)} .step.r{background:var(--bad)}
+.station{position:absolute;top:14px;width:20px;height:20px;margin-left:-10px;border-radius:6px;background:var(--surface);border:2px solid var(--line);transform:rotate(45deg)}
+.station.on{border-color:var(--accent);background:var(--accent)}
+.slabel{position:absolute;top:40px;transform:translateX(-50%);font:500 11px var(--mono);color:var(--muted);white-space:nowrap}
+.slabel.on{color:var(--ink);font-weight:600}
+.goal{position:absolute;right:-18px;top:6px;width:36px;height:36px;border-radius:8px;display:grid;place-items:center;
+  background:repeating-conic-gradient(var(--ink) 0 25%, var(--surface) 0 50%) 0 0/12px 12px;border:2px solid var(--ink)}
+.avatar{position:absolute;top:2px;width:44px;height:44px;margin-left:-22px;border-radius:50%;background:var(--accent);color:var(--on-accent);
+  display:grid;place-items:center;box-shadow:0 0 0 4px var(--surface);transition:left .6s cubic-bezier(.3,1.4,.5,1)}
+.avatar svg{width:26px;height:26px}
+.hop{animation:hop .6s ease}
+@keyframes hop{40%{transform:translateY(-12px)}}
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 64px}
+.wrap{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(34px,7vw,56px);font-weight:700}
+h2{font-size:clamp(24px,4.5vw,32px);font-weight:700}
+h3{font-size:20px;font-weight:600}
+p{margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:16px}
+.btn{font:600 16px var(--body);border:0;border-radius:10px;padding:13px 22px;background:var(--accent);color:var(--on-accent);cursor:pointer;min-height:48px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.small{padding:8px 14px;min-height:38px;font-size:14px}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+input[type=text]{font:500 18px var(--body);padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--raised);color:var(--ink);width:100%;max-width:420px}
+input.mono{font-family:var(--mono)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.rules div{background:var(--raised);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:4px}
+.rules b{font-family:var(--display);font-size:22px}
+.stops{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font:500 13px var(--mono)}
+.stops span{padding:4px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.stops i{color:var(--muted);font-style:normal}
+.thead{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.code-pill{font-family:var(--mono);font-size:12px;padding:4px 10px;border-radius:999px;color:var(--on-accent);background:var(--accent)}
+.scen{background:var(--bg);border-left:4px solid var(--accent);border-radius:8px;padding:12px 14px;font-size:15px}
+.q{font-size:20px;font-weight:600;line-height:1.4}
+.how{font-size:14px;color:var(--muted)}
+.opts{display:grid;gap:10px}
+.opt,.chip,.tok,.seg button,.tt button{font:500 16px var(--body);text-align:left;background:var(--raised);color:var(--ink);border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;cursor:pointer;min-height:48px}
+.opt:disabled{opacity:.55;cursor:not-allowed;text-decoration:line-through}
+.opt.sel,.chip.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.opt.multi{display:flex;gap:12px;align-items:center}
+.opt.multi::before{content:"";flex:none;width:20px;height:20px;border-radius:5px;border:2px solid var(--muted)}
+.opt.multi.sel::before{background:var(--accent);border-color:var(--accent)}
+.good{border-color:var(--good)!important;background:var(--good-bg)!important}
+.bad{border-color:var(--bad)!important;background:var(--bad-bg)!important}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cols>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.chip{display:flex;gap:10px;align-items:center;font-size:15px}
+.chip::before{content:attr(data-tag);flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;font:600 13px var(--mono);background:var(--bg);color:var(--muted)}
+.chip[data-tag=""]::before{content:"·"}
+.chip.linked::before{background:var(--accent);color:var(--on-accent)}
+.seq{min-height:60px;border:1.5px dashed var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px;margin:0;list-style:none}
+.seq.inline{flex-direction:row;flex-wrap:wrap}
+.seq:empty::after{content:attr(data-empty);color:var(--muted);font-size:14px;padding:6px}
+.pool{display:flex;flex-direction:column;gap:8px}
+.pool.inline{flex-direction:row;flex-wrap:wrap}
+.tok{font-family:var(--mono);font-size:15px;padding:8px 12px;min-height:42px}
+.sortrow{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{padding:8px 12px;min-height:40px;font-size:14px}
+.seg button.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.ttwrap,.refwrap{overflow-x:auto}
+table.tt,table.ref{border-collapse:collapse;font-family:var(--mono);font-variant-numeric:tabular-nums}
+table.tt{font-size:16px}
+table.ref{font-size:13px;margin-top:6px}
+.tt th,.tt td,.ref th,.ref td{border:1px solid var(--line);padding:5px 12px;text-align:center}
+.ref td{text-align:left}
+.tt th,.ref th{background:var(--bg)}
+.tt button{font-family:var(--mono);text-align:center;min-width:56px;min-height:40px;padding:6px}
+.expr{font-family:var(--mono);font-size:17px;background:var(--bg);padding:8px 12px;border-radius:8px;align-self:flex-start}
+.refs{display:flex;flex-wrap:wrap;gap:16px}
+details.refbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 16px}
+details.refbox summary{cursor:pointer;font-weight:600}
+.fb{border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;border:1.5px solid}
+.fb.ok{background:var(--good-bg);border-color:var(--good)}
+.fb.part{background:var(--warn-bg);border-color:var(--warn)}
+.fb.no{background:var(--bad-bg);border-color:var(--bad)}
+.fb .v{font-family:var(--display);font-size:22px;font-weight:700}
+.fb ul,.fb ol{margin:0;padding-left:22px}
+.ans{font-family:var(--mono);font-size:14px;white-space:pre-wrap}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:12px 20px;border-radius:999px;font-weight:600;z-index:20;transition:opacity .3s;max-width:calc(100% - 32px);text-align:center}
+.lbtable{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:tabular-nums}
+.lbtable th{font:600 12px var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.lbtable td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.lbtable tr.me td{background:var(--warn-bg);font-weight:600}
+.lbtable td.r{text-align:right;font-family:var(--mono)}
+.rank{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--bg);font:600 14px var(--mono)}
+.rank.t1,.rank.t2,.rank.t3{background:var(--accent);color:var(--on-accent)}
+.pill{display:inline-block;font:500 12px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.done{border-color:var(--good);color:var(--good)}
+.lbwrap{overflow-x:auto}
+.big{font-family:var(--display);font-size:clamp(56px,14vw,96px);font-weight:700;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+.res-row{display:grid;grid-template-columns:minmax(0,1.6fr) 3fr 64px;gap:12px;align-items:center;font-size:14px}
+.res-row b{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.meter{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:99px}
+details.miss{border-top:1px solid var(--line);padding-top:10px}
+details.miss summary{cursor:pointer;font-weight:600}
+details.miss ul{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.q{font-size:18px}.panel{padding:18px}.slabel{display:none}.slabel.on{display:block}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ---- arcade skin ---- */
+*{border-radius:0!important}
+body{background-color:var(--bg);background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%221600%22%20height%3D%22420%22%20viewBox%3D%220%200%201600%20420%22%20shape-rendering%3D%22crispEdges%22%3E%3Crect%20x%3D%2296%22%20y%3D%2232%22%20width%3D%2248%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%2280%22%20y%3D%2248%22%20width%3D%2280%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%2296%22%20y%3D%2264%22%20width%3D%2264%22%20height%3D%2216%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%22504%22%20y%3D%2216%22%20width%3D%2272%22%20height%3D%2224%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22480%22%20y%3D%2240%22%20width%3D%22120%22%20height%3D%2224%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22504%22%20y%3D%2264%22%20width%3D%2296%22%20height%3D%2224%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%22976%22%20y%3D%2256%22%20width%3D%2248%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22960%22%20y%3D%2272%22%20width%3D%2280%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22976%22%20y%3D%2288%22%20width%3D%2264%22%20height%3D%2216%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%221336%22%20y%3D%2224%22%20width%3D%2248%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%221320%22%20y%3D%2240%22%20width%3D%2280%22%20height%3D%2216%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%221336%22%20y%3D%2256%22%20width%3D%2264%22%20height%3D%2216%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%22728%22%20y%3D%2296%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22720%22%20y%3D%22104%22%20width%3D%2240%22%20height%3D%228%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22728%22%20y%3D%22112%22%20width%3D%2232%22%20height%3D%228%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%22248%22%20y%3D%22112%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22240%22%20y%3D%22120%22%20width%3D%2240%22%20height%3D%228%22%20fill%3D%22%23FFFFFF%22/%3E%3Crect%20x%3D%22248%22%20y%3D%22128%22%20width%3D%2232%22%20height%3D%228%22%20fill%3D%22%23F1EEFF%22/%3E%3Crect%20x%3D%220%22%20y%3D%22320%22%20width%3D%2248%22%20height%3D%2296%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%2248%22%20y%3D%22256%22%20width%3D%2256%22%20height%3D%22160%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22104%22%20y%3D%22328%22%20width%3D%2232%22%20height%3D%2288%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22136%22%20y%3D%22328%22%20width%3D%2264%22%20height%3D%2288%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22200%22%20y%3D%22264%22%20width%3D%2248%22%20height%3D%22152%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22248%22%20y%3D%22272%22%20width%3D%2232%22%20height%3D%22144%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22280%22%20y%3D%22336%22%20width%3D%2240%22%20height%3D%2280%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22320%22%20y%3D%22288%22%20width%3D%2232%22%20height%3D%22128%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22352%22%20y%3D%22328%22%20width%3D%2256%22%20height%3D%2288%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22408%22%20y%3D%22328%22%20width%3D%2240%22%20height%3D%2288%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22448%22%20y%3D%22288%22%20width%3D%2264%22%20height%3D%22128%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22512%22%20y%3D%22264%22%20width%3D%2232%22%20height%3D%22152%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22544%22%20y%3D%22312%22%20width%3D%2232%22%20height%3D%22104%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22576%22%20y%3D%22256%22%20width%3D%2272%22%20height%3D%22160%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22648%22%20y%3D%22336%22%20width%3D%2264%22%20height%3D%2280%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22712%22%20y%3D%22264%22%20width%3D%2264%22%20height%3D%22152%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22776%22%20y%3D%22336%22%20width%3D%2256%22%20height%3D%2280%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22832%22%20y%3D%22336%22%20width%3D%2240%22%20height%3D%2280%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22872%22%20y%3D%22320%22%20width%3D%2264%22%20height%3D%2296%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22936%22%20y%3D%22288%22%20width%3D%2248%22%20height%3D%22128%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%22984%22%20y%3D%22272%22%20width%3D%2240%22%20height%3D%22144%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221024%22%20y%3D%22264%22%20width%3D%2232%22%20height%3D%22152%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221056%22%20y%3D%22272%22%20width%3D%2248%22%20height%3D%22144%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221104%22%20y%3D%22320%22%20width%3D%2272%22%20height%3D%2296%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221176%22%20y%3D%22264%22%20width%3D%2232%22%20height%3D%22152%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221208%22%20y%3D%22256%22%20width%3D%2264%22%20height%3D%22160%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221272%22%20y%3D%22296%22%20width%3D%2240%22%20height%3D%22120%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221312%22%20y%3D%22272%22%20width%3D%2232%22%20height%3D%22144%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221344%22%20y%3D%22328%22%20width%3D%2272%22%20height%3D%2288%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221416%22%20y%3D%22336%22%20width%3D%2264%22%20height%3D%2280%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221480%22%20y%3D%22312%22%20width%3D%2264%22%20height%3D%22104%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%221544%22%20y%3D%22256%22%20width%3D%2256%22%20height%3D%22160%22%20fill%3D%22%23DCD6F7%22/%3E%3Crect%20x%3D%220%22%20y%3D%22320%22%20width%3D%2272%22%20height%3D%2296%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%2224%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2256%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%228%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2224%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2256%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%228%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2224%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2240%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2256%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2272%22%20y%3D%22304%22%20width%3D%2240%22%20height%3D%22112%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%2280%22%20y%3D%22320%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2280%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2296%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%2280%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22120%22%20y%3D%22328%22%20width%3D%2256%22%20height%3D%2288%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22160%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22160%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22144%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22192%22%20y%3D%22312%22%20width%3D%2288%22%20height%3D%22104%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22200%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22216%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22248%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22264%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22200%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22216%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22232%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22264%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22200%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22216%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22248%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22264%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22200%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22264%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22288%22%20y%3D%22320%22%20width%3D%2280%22%20height%3D%2296%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22312%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22328%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22344%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22296%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22312%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22344%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22296%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22312%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22328%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22384%22%20y%3D%22304%22%20width%3D%2288%22%20height%3D%22112%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22440%22%20y%3D%22320%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22440%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22456%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22392%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22408%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22424%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22456%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22392%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22424%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22456%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22488%22%20y%3D%22360%22%20width%3D%2240%22%20height%3D%2256%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22496%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22512%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22504%22%20y%3D%22312%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22496%22%20y%3D%22312%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22480%22%20y%3D%22288%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22528%22%20y%3D%22288%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22472%22%20y%3D%22272%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%22536%22%20y%3D%22272%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%22536%22%20y%3D%22360%22%20width%3D%2264%22%20height%3D%2256%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22544%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22560%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22544%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22560%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22576%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22616%22%20y%3D%22312%22%20width%3D%2256%22%20height%3D%22104%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22640%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22656%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22640%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22656%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22624%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22640%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22656%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22640%22%20y%3D%22264%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22632%22%20y%3D%22264%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22616%22%20y%3D%22240%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22664%22%20y%3D%22240%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%22608%22%20y%3D%22224%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%22672%22%20y%3D%22224%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%22680%22%20y%3D%22328%22%20width%3D%2248%22%20height%3D%2288%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22704%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22704%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22688%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22728%22%20y%3D%22344%22%20width%3D%2288%22%20height%3D%2272%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22768%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22784%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22800%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22736%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22752%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22768%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22784%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22824%22%20y%3D%22328%22%20width%3D%2288%22%20height%3D%2288%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22848%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22864%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22880%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22896%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22832%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22896%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22864%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22912%22%20y%3D%22352%22%20width%3D%2264%22%20height%3D%2264%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22920%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22952%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22952%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%22976%22%20y%3D%22352%22%20width%3D%2280%22%20height%3D%2264%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%22984%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221000%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221016%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221000%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221064%22%20y%3D%22304%22%20width%3D%2248%22%20height%3D%22112%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221072%22%20y%3D%22320%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221088%22%20y%3D%22320%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221072%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221072%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221088%22%20y%3D%22256%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221080%22%20y%3D%22256%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221064%22%20y%3D%22232%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221112%22%20y%3D%22232%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221056%22%20y%3D%22216%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221120%22%20y%3D%22216%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221112%22%20y%3D%22336%22%20width%3D%2240%22%20height%3D%2280%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221120%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221136%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221136%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221120%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221128%22%20y%3D%22288%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221120%22%20y%3D%22288%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221104%22%20y%3D%22264%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221152%22%20y%3D%22264%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221096%22%20y%3D%22248%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221160%22%20y%3D%22248%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221168%22%20y%3D%22312%22%20width%3D%2256%22%20height%3D%22104%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221208%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221208%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221176%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221192%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221192%22%20y%3D%22264%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221184%22%20y%3D%22264%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221168%22%20y%3D%22240%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221216%22%20y%3D%22240%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221160%22%20y%3D%22224%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221224%22%20y%3D%22224%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221224%22%20y%3D%22296%22%20width%3D%2264%22%20height%3D%22120%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221264%22%20y%3D%22312%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221232%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221232%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221264%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221232%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221264%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221288%22%20y%3D%22328%22%20width%3D%2264%22%20height%3D%2288%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221312%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221328%22%20y%3D%22344%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221312%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221328%22%20y%3D%22368%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221296%22%20y%3D%22392%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221360%22%20y%3D%22344%22%20width%3D%2272%22%20height%3D%2272%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221384%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221400%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221416%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221368%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221384%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221400%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221432%22%20y%3D%22288%22%20width%3D%2280%22%20height%3D%22128%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221456%22%20y%3D%22304%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221440%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221472%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221488%22%20y%3D%22328%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221472%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221488%22%20y%3D%22352%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221440%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221456%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221472%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221488%22%20y%3D%22376%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221456%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221488%22%20y%3D%22400%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221472%22%20y%3D%22240%22%20width%3D%228%22%20height%3D%2248%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221464%22%20y%3D%22240%22%20width%3D%2224%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221448%22%20y%3D%22216%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221496%22%20y%3D%22216%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23B3A9E2%22/%3E%3Crect%20x%3D%221440%22%20y%3D%22200%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221504%22%20y%3D%22200%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23CFC8F0%22/%3E%3Crect%20x%3D%221520%22%20y%3D%22296%22%20width%3D%2272%22%20height%3D%22120%22%20fill%3D%22%23C8C0EC%22/%3E%3Crect%20x%3D%221528%22%20y%3D%22312%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221560%22%20y%3D%22312%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221528%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221560%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221576%22%20y%3D%22336%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221544%22%20y%3D%22360%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3Crect%20x%3D%221576%22%20y%3D%22384%22%20width%3D%228%22%20height%3D%228%22%20fill%3D%22%23F7F5FF%22/%3E%3C/svg%3E"),linear-gradient(rgba(42,33,80,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(42,33,80,.05) 1px,transparent 1px);background-size:1600px 420px,32px 32px,32px 32px;background-repeat:repeat-x,repeat,repeat;background-position:center bottom,0 0,0 0;background-attachment:fixed}
+
+.top{background:var(--surface);border-bottom:4px solid var(--shadow);box-shadow:0 4px 0 var(--accent)}
+body::before{background:var(--surface)}
+.brand{font:12px/1.4 var(--display);letter-spacing:1px;color:var(--ink)}
+.brand span{color:var(--ink);background:var(--accent);padding:3px 6px}
+.stat small{font:9px var(--display);letter-spacing:1px}
+.stat b{font:13px var(--display);color:var(--ink)}
+h1{font:clamp(22px,5vw,40px)/1.35 var(--display);text-shadow:4px 4px 0 var(--accent);color:var(--ink)}
+h2{font:clamp(16px,3.4vw,22px)/1.4 var(--display)}
+h3{font:13px/1.5 var(--display);letter-spacing:.5px}
+.eyebrow{font:10px/1.6 var(--display);letter-spacing:1px;color:var(--muted)}
+.panel{background:var(--surface);border:3px solid var(--shadow);box-shadow:6px 6px 0 var(--shadow)}
+.btn{font:11px/1.2 var(--display);letter-spacing:1px;text-transform:uppercase;border:3px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);padding:14px 20px;transition:transform .06s,box-shadow .06s}
+.btn:active:not(:disabled){transform:translate(4px,4px);box-shadow:none}
+.btn.ghost{border:3px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow);color:var(--ink);background:var(--surface)}
+.btn.small{font-size:9px;padding:9px 12px;min-height:36px}
+input[type=text]{border:3px solid var(--shadow);background:var(--surface);font-family:var(--body)}
+input.mono{font-family:var(--mono)}
+.rules div{background:var(--surface);border:3px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow)}
+.rules b{font:16px/1.4 var(--display);color:var(--ink);text-shadow:2px 2px 0 var(--accent)}
+.stops span{font:9px/1.4 var(--display);border:2px solid var(--shadow);background:var(--surface);padding:6px 8px}
+.code-pill{font:9px var(--display);padding:6px 8px}
+.scen{border-left:6px solid var(--accent);background:var(--raised)}
+.opt,.chip,.tok,.seg button,.tt button{border:3px solid var(--line);background:var(--raised)}
+.opt:hover:not(:disabled),.chip:hover,.tok:hover,.seg button:hover{border-color:var(--muted)}
+.opt.sel,.chip.sel{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.chip::before{font:9px var(--display);background:var(--bg)}
+.seq{border:3px dashed var(--line)}
+.fb{border-width:3px;box-shadow:6px 6px 0 var(--shadow)}
+.fb .v{font:13px/1.5 var(--display)}
+.toast{font:10px/1.5 var(--display);background:var(--accent);color:var(--ink);border:3px solid var(--shadow);box-shadow:4px 4px 0 var(--shadow)}
+.big{font-family:var(--display);font-size:clamp(40px,10vw,72px);color:var(--ink);text-shadow:5px 5px 0 var(--accent)}
+.meter{height:12px;background:var(--raised);border:2px solid var(--shadow)}
+.track .line{height:6px;top:21px;background:repeating-linear-gradient(90deg,var(--line) 0 12px,transparent 12px 18px)}
+.track .fill{height:6px;top:21px}
+.step{width:6px;height:6px;margin-left:-3px;top:21px}
+.station{transform:none;width:16px;height:16px;margin-left:-8px;top:16px;border:3px solid var(--shadow);background:var(--surface)}
+.slabel{font:8px var(--display);top:56px}
+.track{height:74px}
+.avatar{box-shadow:4px 4px 0 var(--shadow);border:3px solid var(--shadow)}
+.hop{animation:hop .6s steps(4)}
+.lbtable th{font:9px var(--display)}
+.lbtable td{border-bottom:2px solid var(--line)}
+.lbtable td.r{font:12px var(--display)}
+.rank{font:11px var(--display);background:var(--raised);border:2px solid var(--shadow)}
+.rank.t1{background:#FFD23F;color:#1A1433}
+.rank.t2{background:#D9D5E8;color:#1A1433}
+.rank.t3{background:#F2A66B;color:#1A1433}
+.pill{font:8px var(--display);padding:4px 6px;border-width:2px}
+.blink{animation:blink 1.1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.blink{animation:none}}
+</style>
+
+<div class="top">
+  <div class="bar-in">
+    <div class="brand" id="brand"></div>
+    <div class="stat"><small>Mark</small><b id="sMark">0.0</b><small>/10</small></div>
+    <div class="stat"><small>Task</small><b id="sTask">0/0</b></div>
+    <div class="stat"><small>Time</small><b id="sTime">00:00</b></div>
+    <button class="btn ghost small" type="button" id="lbBtn" hidden>High scores</button>
+  </div>
+  <div class="journey"><div class="track" id="track"></div></div>
+</div>
+<main><div class="wrap" id="app"></div></main>
+
+<script>
+const QUEST={
+id:'L1',title:'Signal Quest 1',brand:'Formative 1 · <span>Out of the Laptop</span>',eyebrow:'IB Computer Science · SL · Formative assessment 1 of 3 · Topic A',
+accentL:'#2747D8',accentD:'#3EC6F0',
+intro:'A message typed on a school laptop has to get out to the school router. Every correct answer moves the signal one step further. Mixed tasks from A1, A2, A3 and A4. Answer all 18 correctly to reach the router.',
+stations:['Start','Level 1','Level 2','Level 3','Level 4','Level 5','Finish'],
+goalToast:'Finish! Goal reached',goalText:'Router reached. The signal got out of the laptop with every answer correct.',
+avatar:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" fill="currentColor"/></svg>',
+sub:{'A1':'Computer fundamentals','A2':'Networks','A3':'Databases','A4':'Machine learning'},
+tasks:[
+{c:'A1',t:'mcq',q:'Which part of the CPU decodes instructions?',o:['Control unit (CU)','Arithmetic logic unit (ALU)','Cache','Data bus'],e:'The CU decodes instructions and sends control signals. The ALU does arithmetic and logic.'},
+{c:'A2',t:'multi',q:'Which two types of network are designed to work over short distances?',o:[['PAN (personal area network)',1],['LAN (local area network)',1],['WAN (wide area network)',0],['The internet',0]],e:'A PAN covers the space around one person; a LAN covers one building or campus.'},
+{c:'A1',t:'match',q:'Match each register to its role in the machine instruction cycle.',pairs:[['PC','Holds the address of the next instruction'],['MAR','Holds the address to be read from or written to'],['MDR','Holds the data just read from, or to be written to, memory'],['IR','Holds the instruction being decoded and executed'],['Accumulator (AC)','Holds the result of ALU calculations']],e:'PC and MAR hold addresses; MDR, IR and AC hold data or instructions.'},
+{c:'A3',t:'mcq',q:'What is the purpose of a primary key?',o:['To uniquely identify each record in a table','To link two tables together','To sort the table alphabetically','To encrypt the table'],e:'Each value of a primary key is unique and not empty. Linking tables is the job of a foreign key.'},
+{c:'A1',t:'match',q:'Match each bus to what it carries.',pairs:[['Data bus','Data and instructions between the CPU and memory, in both directions'],['Address bus','The memory address the CPU wants, from the CPU only'],['Control bus','Control signals such as read, write and the clock']],e:'The three buses together make up the system bus.'},
+{c:'A4',t:'sort',q:'Which type of machine learning fits each situation?',cats:['Supervised','Unsupervised','Reinforcement'],items:[['Recognising classmates from photos labelled with their names',0],['Screening CVs using past CVs labelled hired / not hired',0],['Finding which products customers buy together',1],['Grouping customers with no labels',1],['A robot learning to navigate from rewards and penalties',2],['Choosing replies to reviews from customers’ later behaviour',2]],e:'Supervised uses labelled data; unsupervised finds patterns in unlabelled data; reinforcement learns from rewards by trial and error.'},
+{c:'A2',t:'match',q:'Match each network device to its function.',pairs:[['NIC','Lets a device connect to a network and send/receive packets'],['WAP','Lets wireless devices connect to a wired network'],['Modem','Converts digital data to a signal for the line and back'],['Switch','Sends data only to the device it is meant for, inside a LAN'],['Router','Forwards packets between different networks'],['Gateway','Joins networks that use different protocols']],e:'A hub, unlike a switch, sends data to every device on the network.'},
+{c:'A1',t:'order',q:'Order the memory from fastest to slowest.',items:['CPU registers','Cache','RAM','Hard disk'],e:'The faster the memory, the smaller and more expensive per byte it is.'},
+{c:'A1',t:'type',q:'State the decimal equivalent of the binary number 1011010.',a:['90'],num:1,ph:'decimal',e:'64 + 16 + 8 + 2 = 90.'},
+{c:'A2',t:'mcq',q:'A website returns the HTTP response code 500 Internal Server Error. What does it mean?',o:['The server had an unexpected problem and could not complete the request','The page does not exist','You do not have permission to see the page','The request worked'],e:'5xx codes are server-side errors. 404 = not found, 403 = forbidden, 200 = OK.'},
+{c:'A3',t:'match',q:'Match each type of key to its description.',pairs:[['Primary key','Uniquely identifies each record'],['Foreign key','A field that refers to the primary key of another table'],['Composite key','A primary key made of two or more fields'],['Candidate key','Any field that could be chosen as the primary key']],e:'Only one candidate key is chosen as the primary key.'},
+{c:'A4',t:'mcq',q:'State one advantage of using a GPU to train a machine learning model.',o:['Thousands of small cores do many calculations at the same time (in parallel)','It has fewer, faster cores than a CPU','It stores the training data permanently','It removes bias from the data'],e:'A CPU works mostly sequentially; a GPU does huge numbers of matrix operations in parallel.'},
+{c:'A2',t:'type',q:'In the CIDR address 192.168.1.0/24, how many bits belong to the network part?',a:['24'],num:1,ph:'bits',e:'The number after the slash is the number of network bits.'},
+{c:'A1',t:'tt',q:'Complete the truth table.',vars:['A','B','C'],expr:'Q = (A XOR B) AND NOT C',out:[0,0,1,0,1,0,0,0],e:'Q = 1 only when A and B are different and C = 0.'},
+{c:'A3',t:'type',s:'Table Users(ID, Name, JoinYear, Subscription). Subscription is bronze, silver or gold.',q:'Write an SQL query to list the IDs of all users with a gold subscription.',sql:1,a:["SELECT ID FROM Users WHERE Subscription = 'gold';"],ph:'SELECT …',e:"SELECT ID FROM Users WHERE Subscription = 'gold';"},
+{c:'A4',t:'mcq',q:'How can bias be introduced into a machine learning model?',o:['The training data is not representative, e.g. some groups are under-represented','The model is trained on a GPU','The model is tested on new data','The data is encrypted'],e:'The model learns any imbalance in its training data and repeats it in its predictions.'},
+{c:'A1',t:'mcq',q:'A hospital wants emergency tasks and administration tasks kept in separate queues, each with its own scheduling. Which approach is this?',o:['Multilevel queue scheduling','First-come first-served','Round robin','Polling'],e:'Multilevel queue scheduling splits processes into separate queues by type. Priority scheduling uses one queue ordered by priority.'},
+{c:'A4',t:'mcq',q:'What is transfer learning?',o:['Reusing a model already trained on a large dataset and fine-tuning it for a new task','Training a new model from scratch on a huge dataset','Moving a model from a GPU to a CPU','Learning from rewards and penalties'],e:'It needs much less labelled data and training time, because the general features are already learned.'}
+]};
+
+</script>
+<script>
+const Q=QUEST, N=Q.tasks.length, KEY='formative.'+Q.id+'.v1';
+let S=load()||fresh();
+function fresh(){return {name:'',started:null,finished:null,order:null,res:[]}}
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY));return x&&Array.isArray(x.res)?x:null}catch(e){return null}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function el(t,a={},...kids){const e=document.createElement(t);for(const k in a){const v=a[k];if(v==null||v===false)continue;if(k==='class')e.className=v;else if(k==='style')e.setAttribute('style',v);else if(k==='html')e.innerHTML=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':v);}for(const c of kids.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)));}return e}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function shuffledNot(a){if(a.length<2)return a.slice();let s,n=0;do{s=shuffle(a);n++}while(n<20&&s.every((x,i)=>x===a[i]));return s}
+function fmt(ms){const s=Math.max(0,Math.floor(ms/1000));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+const app=document.getElementById('app');
+const pts=()=>S.res.reduce((a,r)=>a+r.p,0);           // each task 0..1
+const mark=()=>Math.round(pts()/N*100)/10;             // out of 10, one decimal
+const correct=()=>S.res.filter(r=>r.ok).length;
+document.getElementById('brand').innerHTML=Q.brand;
+function updBar(){document.getElementById('sMark').textContent=mark().toFixed(1);
+ document.getElementById('sTask').textContent=Math.min(S.res.length+1,N)+'/'+N;
+ document.getElementById('sTime').textContent=fmt(S.started?((S.finished||Date.now())-S.started):0)}
+setInterval(updBar,1000);
+function toast(msg){const t=el('div',{class:'toast',role:'status'},msg);document.body.append(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),400)},2000)}
+function go(fn){app.replaceChildren();fn();updBar();drawTrack();window.scrollTo({top:0})}
+/* journey track: avatar position = correct answers / N */
+let lastPos=null;
+function stationAt(pos){let k=0;Q.stations.forEach((s,i)=>{if(pos>=i/(Q.stations.length-1)-1e-9)k=i});return k}
+function drawTrack(){
+ const tr=document.getElementById('track');const pos=correct()/N;
+ const kids=[el('div',{class:'line'}),el('div',{class:'fill',style:`width:${pos*100}%`})];
+ for(let i=0;i<N;i++){const r=S.res[i];kids.push(el('div',{class:'step'+(r?(r.ok?(r.p===1?' g':' a'):' r'):''),style:`left:${(i+0.5)/N*100}%`}))}
+ const cur=stationAt(pos);
+ Q.stations.forEach((s,i)=>{const x=i/(Q.stations.length-1)*100;if(i===Q.stations.length-1)return;
+  kids.push(el('div',{class:'station'+(i<=cur?' on':''),style:`left:${x}%`}),el('div',{class:'slabel'+(i===cur?' on':''),style:`left:${Math.max(4,Math.min(96,x))}%`},s))});
+ kids.push(el('div',{class:'goal',title:Q.stations[Q.stations.length-1],'aria-hidden':'true'}));
+ const av=el('div',{class:'avatar',style:`left:${(lastPos??pos)*100}%`,'aria-label':`Progress: ${correct()} of ${N} correct, at ${Q.stations[cur]}`,html:Q.avatar});
+ kids.push(av);tr.replaceChildren(...kids);
+ if(lastPos!==null&&lastPos!==pos){requestAnimationFrame(()=>{av.style.left=pos*100+'%';av.classList.add('hop')});
+  const prev=stationAt(lastPos);if(cur>prev)setTimeout(()=>toast(cur===Q.stations.length-1?Q.goalToast:'Reached: '+Q.stations[cur]),500)}
+ lastPos=pos;
+}
+/* class leaderboard (shared db; each student writes results/<their id>) */
+const LB={db:null,uid:null,owner:false,canWrite:true,rows:[],state:'off',q:Promise.resolve()};
+function lbBody(){return {name:S.name,mark:mark(),correct:correct(),firstTry:S.res.filter(r=>r.ok&&r.a===1).length,done:S.res.length,total:N,finished:S.res.length>=N,
+ timeMs:S.started?((S.finished||Date.now())-S.started):0,attempt:S.attempt||1,updatedAt:new Date().toISOString()}}
+function pushResult(){if(!LB.db||!LB.uid||!LB.canWrite||!S.name)return;const body=lbBody();
+ LB.q=LB.q.then(()=>LB.db.doc('results/'+LB.uid).set(body)).catch(e=>{if(e&&e.code==='invalid_argument')LB.canWrite=false});}
+(async()=>{try{const c=window.claude;if(!c||!c.use)return;
+ const [db,user]=await Promise.all([c.use('db'),c.use('user')]);if(!db)return;LB.db=db;
+ if(user){LB.uid=await user.id();LB.owner=await user.isOwner().catch(()=>false);if(await user.can('data.write').catch(()=>null)===false)LB.canWrite=false}
+ LB.state='loading';paintBoards();const timer=setTimeout(()=>{if(LB.state==='loading'){LB.state='slow';paintBoards()}},10000);
+ db.collection('results').onSnapshot(snap=>{if(!snap.metadata.fromCache)clearTimeout(timer);LB.rows=snap.docs.map(d=>Object.assign({id:d.id},d.data()));LB.state='ok';paintBoards()},
+  ()=>{clearTimeout(timer);LB.state='error';paintBoards()});
+ if(S.started)pushResult();
+}catch(e){}})();
+function sortedRows(){return LB.rows.filter(r=>r&&typeof r.name==='string').slice().sort((a,b)=>(b.mark||0)-(a.mark||0)||(b.done||0)-(a.done||0)||(a.timeMs||0)-(b.timeMs||0))}
+function boardEl(){const box=el('div',{class:'lbbox'});box._paint=()=>{
+ let body;
+ if(LB.state==='off')body=el('p',{class:'muted'},'The class leaderboard is not available in this view. Your own result is still shown above.');
+ else if(LB.state==='loading')body=el('p',{class:'muted'},'Loading the leaderboard…');
+ else if(LB.state==='error')body=el('p',{class:'muted'},'The leaderboard could not be loaded. Your own result is still saved on this device.');
+ else{const rows=sortedRows();
+  if(!rows.length)body=el('p',{class:'muted'},LB.state==='slow'?'The leaderboard cannot be reached yet.':'No results yet. Names appear here as soon as students start.');
+  else body=el('div',{class:'lbwrap'},el('table',{class:'lbtable'},
+   el('tr',{},el('th',{},'#'),el('th',{},'Name'),el('th',{style:'text-align:right'},'Mark'),el('th',{},'Progress'),el('th',{style:'text-align:right'},'Time'),LB.owner?el('th',{},''):null),
+   rows.map((r,i)=>{const me=r.id===LB.uid;const delCell=LB.owner?el('td',{},delBtn(r)):null;
+    return el('tr',{class:me?'me':''},el('td',{},el('span',{class:'rank t'+(i+1)},i+1)),
+     el('td',{},r.name,me?el('span',{class:'muted'},' (you)'):null,(r.attempt||1)>1?el('span',{class:'pill',style:'margin-left:8px'},'attempt '+r.attempt):null),
+     el('td',{class:'r'},Number(r.mark||0).toFixed(1)),
+     el('td',{},r.finished?el('span',{class:'pill done'},'finished'):el('span',{class:'pill'},(r.done||0)+'/'+(r.total||N))),
+     el('td',{class:'r'},fmt(r.timeMs||0)),delCell)})));
+  if(LB.state==='slow'&&rows.length)body=el('div',{},el('p',{class:'muted',style:'font-size:13px'},'May be out of date.'),body);}
+ box.replaceChildren(body)};box._paint();return box}
+function delBtn(r){const w=el('span',{});const b=el('button',{class:'btn ghost small',type:'button',onclick:()=>{w.replaceChildren(
+ el('button',{class:'btn small',type:'button',onclick:async()=>{try{await LB.db.doc('results/'+r.id).delete()}catch(e){}}},'Remove'),
+ el('button',{class:'btn ghost small',type:'button',onclick:()=>w.replaceChildren(b)},'Keep'))}},'Remove');w.append(b);return w}
+function paintBoards(){document.querySelectorAll('.lbbox').forEach(b=>b._paint&&b._paint())}
+function board(){app.append(el('div',{class:'row',style:'justify-content:space-between'},el('h2',{},'High scores'),
+ el('button',{class:'btn ghost small',type:'button',onclick:()=>go(S.name&&S.started?(S.res.length>=N?results:task):start)},'← Back')),
+ el('section',{class:'panel'},el('p',{class:'muted',style:'font-size:14px'},Q.title+' · sorted by mark, then by progress and time. Updates live.'),boardEl()))}
+document.getElementById('lbBtn').addEventListener('click',()=>go(board));
+/* screens */
+function start(){
+ if(S.name&&S.started)return go(S.res.length>=N?results:task);
+ const inp=el('input',{type:'text',id:'name',placeholder:'First name and surname',autocomplete:'off',value:S.name||''});
+ const btn=el('button',{class:'btn',type:'button',disabled:true,onclick:()=>{S.name=inp.value.trim();S.started=Date.now();S.order=Q.tasks.map((_,i)=>i);save();pushResult();go(task)}},'Press start');
+ inp.addEventListener('input',()=>btn.disabled=inp.value.trim().length<2);
+ inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&!btn.disabled)btn.click()});
+ btn.disabled=inp.value.trim().length<2;
+ const stops=[];Q.stations.forEach((s,i)=>{if(i)stops.push(el('i',{},'→'));stops.push(el('span',{},s))});
+ app.append(
+  el('section',{style:'display:flex;flex-direction:column;gap:14px'},
+   el('p',{class:'eyebrow'},Q.eyebrow),
+   el('h1',{},Q.title),
+   el('p',{class:'muted',style:'max-width:62ch;font-size:18px'},Q.intro),
+   el('div',{class:'stops'},stops)),
+  el('div',{class:'rules'},
+   el('div',{},el('b',{},N+' tasks'),el('span',{class:'muted'},'the task takes about 30 minutes; the mark is out of 10')),
+   el('div',{},el('b',{},'1 step'),el('span',{class:'muted'},'forward for every correct answer'),),
+   el('div',{},el('b',{},'2 tries'),el('span',{class:'muted'},'per task: full marks first time, half marks on the second try'))),
+  el('div',{class:'panel'},el('label',{for:'name'},el('h3',{class:'blink'},'Enter your name')),inp,el('div',{class:'row'},btn)));
+ inp.focus();
+}
+function refBox(){return Q.ref?el('details',{class:'refbox'},el('summary',{},Q.ref.title),el('div',{class:'refs'},Q.ref.tables.map(t=>el('div',{class:'refwrap'},el('p',{class:'eyebrow',style:'margin-top:8px'},t.name),
+ el('table',{class:'ref'},el('tr',{},t.cols.map(c=>el('th',{},c))),t.rows.map(r=>el('tr',{},r.map(v=>el('td',{},v))))))))):null}
+function task(){
+ if(S.res.length>=N)return results();
+ const t=Q.tasks[S.order[S.res.length]];
+ let attempt=1;
+ const check=el('button',{class:'btn',type:'button',disabled:true},'Check');
+ const ui={body:el('div',{style:'display:flex;flex-direction:column;gap:14px'}),locked:false,ready(v){check.disabled=!v}};
+ const h=TYPES[t.t](t,ui);
+ const fbSlot=el('div',{});
+ check.addEventListener('click',()=>{
+  if(ui.locked)return;ui.locked=true;
+  if(attempt===1){
+   const f=h.grade(false);
+   if(f===1)return finish(1,true,f);
+   attempt=2;check.textContent='Check again';
+   fbSlot.replaceChildren(el('div',{class:'fb part',role:'status'},el('span',{class:'v'},'Not yet. One more try'),
+    el('p',{},(h.hint?h.hint(f):'Look again and change your answer.')+' A correct second try earns half marks.')));
+   h.retry();ui.locked=false;ui.ready(h.isReady());
+  } else {const f=h.grade(true);finish(Math.round(f*0.5*100)/100,f===1,f)}
+ });
+ function finish(p,ok,f){
+  check.hidden=true;
+  S.res.push({i:S.order[S.res.length],p,ok,c:t.c,a:attempt});
+  if(S.res.length>=N&&!S.finished)S.finished=Date.now();
+  save();updBar();drawTrack();pushResult();
+  const last=S.res.length>=N;
+  const nextBtn=el('button',{class:'btn',type:'button',onclick:()=>go(task)},last?'See my result':'Next task');
+  const cls=ok?(attempt===1?'ok':'part'):'no';
+  fbSlot.replaceChildren(el('div',{class:'fb '+cls,role:'status'},
+   el('div',{class:'row',style:'justify-content:space-between'},el('span',{class:'v'},ok?(attempt===1?'Correct · step forward':'Correct on the second try · step forward'):'Not correct · no step this time'),
+    el('b',{style:'font-family:var(--mono)'},`+${p}`)),
+   !ok?el('div',{},el('p',{style:'font-weight:600'},'Answer'),h.answer()):null,
+   el('p',{},t.e)),el('div',{class:'row',style:'margin-top:14px'},nextBtn));
+  nextBtn.focus();
+ }
+ app.append(
+  (t.ref!==false&&Q.ref)?refBox():'',
+  el('section',{class:'panel'},
+   el('div',{class:'thead'},el('span',{class:'code-pill'},t.c),el('span',{class:'muted',style:'font-size:13px'},Q.sub[t.c])),
+   t.s?el('div',{class:'scen'},t.s):null,
+   el('p',{class:'q'},t.q),ui.body,el('div',{class:'row'},check)),
+  fbSlot);
+}
+function results(){
+ if(!S.finished){S.finished=Date.now();save()}
+ const m=mark(),reached=correct()===N,cur=stationAt(correct()/N);
+ const subs={};S.res.forEach(r=>{(subs[r.c]=subs[r.c]||{p:0,n:0});subs[r.c].p+=r.p;subs[r.c].n++});
+ const codes=Object.keys(Q.sub).filter(c=>subs[c]);
+ const missed=S.res.filter(r=>r.p<1).map(r=>({t:Q.tasks[r.i],r}));
+ app.append(
+  el('section',{class:'panel'},
+   el('p',{class:'eyebrow'},Q.title+' · result'),
+   el('h2',{},S.name),
+   el('p',{style:'font-size:18px;font-weight:600'},reached?Q.goalText:`You reached ${Q.stations[cur]}. ${N-correct()} more correct answers would have reached the goal.`),
+   el('div',{class:'row',style:'gap:28px;align-items:flex-end'},
+    el('div',{},el('div',{class:'big'},m.toFixed(1)),el('p',{class:'muted'},'out of 10')),
+    el('div',{style:'display:flex;flex-direction:column;gap:2px'},
+     el('p',{},el('b',{},S.res.filter(r=>r.ok&&r.a===1).length),' correct first time'),
+     el('p',{},el('b',{},S.res.filter(r=>r.ok&&r.a===2).length),' correct on the second try'),
+     el('p',{},el('b',{},S.res.filter(r=>!r.ok).length),' not correct'),
+     el('p',{},el('b',{},fmt(S.finished-S.started)),' total time'))),
+   el('p',{class:'muted',style:'font-size:14px'},'Show this screen to your teacher.')),
+  el('section',{class:'panel'},el('h3',{},'By subtopic'),
+   codes.map(c=>{const v=Math.round(subs[c].p/subs[c].n*100);
+    return el('div',{class:'res-row'},el('span',{},el('b',{style:'text-align:left;font-family:var(--mono)'},c+' '),Q.sub[c]),
+     el('div',{class:'meter'},el('i',{style:`width:${v}%`})),el('b',{},v+'%'))})),
+  missed.length?el('section',{class:'panel'},el('h3',{},'Look at these again'),
+   el('details',{class:'miss'},el('summary',{},`${missed.length} tasks without full marks`),
+    el('ul',{},missed.map(x=>el('li',{},el('b',{},x.t.c+' '),x.t.q,el('br'),el('span',{class:'muted'},x.t.e)))))):null,
+  resetBox());
+}
+function resetBox(){
+ const box=el('div',{class:'row',style:'justify-content:flex-end'});
+ box.append(el('button',{class:'btn ghost small',type:'button',onclick:()=>{box.replaceChildren(el('span',{class:'muted'},'Erase this attempt?'),
+  el('button',{class:'btn small',type:'button',onclick:()=>{const a=(S.attempt||1)+1;S=fresh();S.attempt=a;lastPos=null;save();go(start)}},'Yes, start over'),
+  el('button',{class:'btn ghost small',type:'button',onclick:()=>go(results)},'Cancel'))}},'Start over'));
+ return box;
+}
+/* task types: grade(final) returns 0..1; retry() re-opens after a wrong first try */
+const TYPES={
+ mcq(t,ui){
+  let sel=null;const opts=shuffle(t.o.map((x,i)=>({x,i})));
+  const bs=opts.map(o=>{const b=el('button',{class:'opt',type:'button',onclick:()=>{if(ui.locked)return;sel=o.i;bs.forEach(x=>x.classList.toggle('sel',x===b));ui.ready(true)}},o.x);b._i=o.i;return b});
+  ui.body.append(el('div',{class:'opts'},bs));
+  return {grade(final){if(!final&&sel!==0){const b=bs.find(b=>b._i===sel);b.classList.remove('sel');b.classList.add('bad');b.disabled=true;return 0}
+    bs.forEach(b=>{b.classList.remove('sel');if(b._i===0)b.classList.add('good');else if(b._i===sel)b.classList.add('bad')});return sel===0?1:0},
+   retry(){sel=null},isReady:()=>sel!==null,hint:()=>'That option is crossed out.',answer:()=>el('p',{},t.o[0])};
+ },
+ multi(t,ui){
+  const opts=shuffle(t.o.map((x,i)=>({x:x[0],ok:!!x[1],i})));const on=new Set();
+  const bs=opts.map(o=>{const b=el('button',{class:'opt multi',type:'button','aria-pressed':'false',onclick:()=>{if(ui.locked)return;on.has(o.i)?on.delete(o.i):on.add(o.i);b.classList.toggle('sel',on.has(o.i));b.setAttribute('aria-pressed',on.has(o.i));ui.ready(on.size>0)}},o.x);b._o=o;return b});
+  ui.body.append(el('p',{class:'how'},'Select all that apply.'),el('div',{class:'opts'},bs));
+  const nTrue=opts.filter(o=>o.ok).length;
+  const score=()=>{let r=0,w=0;opts.forEach(o=>{if(on.has(o.i)){o.ok?r++:w++}});return {r,w,f:(r===nTrue&&w===0)?1:Math.max(0,(r-w)/nTrue)}};
+  return {grade(final){const s=score();if(final)bs.forEach(b=>{const o=b._o;b.classList.remove('sel');if(o.ok)b.classList.add('good');else if(on.has(o.i))b.classList.add('bad')});return s.f},
+   retry(){},isReady:()=>on.size>0,hint:()=>{const s=score();return `${s.r} of ${nTrue} correct choices selected${s.w?`, plus ${s.w} wrong`:''}.`},
+   answer:()=>el('ul',{},t.o.filter(x=>x[1]).map(x=>el('li',{},x[0])))};
+ },
+ match(t,ui){
+  const L=t.pairs.map((p,i)=>({x:p[0],i})),R=shuffledNot(t.pairs.map((p,i)=>({x:p[1],i})));
+  const link={};let selL=null;
+  const lb=L.map((l,j)=>el('button',{class:'chip',type:'button','data-tag':String(j+1),onclick:()=>{if(ui.locked)return;if(link[l.i]!=null){delete link[l.i];selL=l.i}else selL=(selL===l.i?null:l.i);paint()}},l.x));
+  const rb=R.map(r=>el('button',{class:'chip',type:'button','data-tag':'',onclick:()=>{if(ui.locked)return;if(selL==null){const own=owner(r.i);if(own!=null){delete link[own];paint()}return}for(const k in link)if(link[k]===r.i)delete link[k];link[selL]=r.i;selL=null;paint()}},r.x));
+  function owner(ri){for(const k in link)if(link[k]===ri)return +k;return null}
+  function paint(){lb.forEach((b,j)=>{const li=L[j].i;b.classList.toggle('sel',selL===li);b.classList.toggle('linked',link[li]!=null)});
+   rb.forEach((b,j)=>{const o=owner(R[j].i);b.dataset.tag=o==null?'':String(L.findIndex(l=>l.i===o)+1);b.classList.toggle('linked',o!=null)});
+   ui.ready(Object.keys(link).length===L.length)}
+  ui.body.append(el('p',{class:'how'},'Tap an item on the left, then its match on the right. Tap a numbered item again to undo.'),el('div',{class:'cols'},el('div',{},lb),el('div',{},rb)));
+  const frac=()=>L.filter(l=>link[l.i]===l.i).length/L.length;
+  return {grade(final){if(final){lb.forEach((b,j)=>b.classList.add(link[L[j].i]===L[j].i?'good':'bad'));rb.forEach((b,j)=>b.classList.add(owner(R[j].i)===R[j].i?'good':'bad'))}return frac()},
+   retry(){},isReady:()=>Object.keys(link).length===L.length,hint:()=>`${Math.round(frac()*L.length)} of ${L.length} pairs are right.`,
+   answer:()=>el('ul',{},t.pairs.map(p=>el('li',{},el('b',{},p[0]),' → ',p[1])))};
+ },
+ order(t,ui){
+  const all=t.items.map((x,i)=>({x,i}));let pool=shuffledNot(all),seq=[];
+  const seqBox=el('ol',{class:'seq','data-empty':'Tap the items below in the right order'}),poolBox=el('div',{class:'pool'});
+  function paint(){seqBox.replaceChildren(...seq.map((o,k)=>el('li',{},el('button',{class:'chip linked',type:'button','data-tag':String(k+1),style:'width:100%',onclick:()=>{if(ui.locked)return;seq.splice(k,1);pool.push(o);paint()}},o.x))));
+   poolBox.replaceChildren(...pool.map((o,k)=>el('button',{class:'chip',type:'button','data-tag':'',onclick:()=>{if(ui.locked)return;pool.splice(k,1);seq.push(o);paint()}},o.x)));
+   ui.ready(pool.length===0)}
+  paint();
+  ui.body.append(el('p',{class:'how'},'Tap to add an item. Tap a numbered item to send it back.'),seqBox,poolBox);
+  const right=()=>seq.filter((o,k)=>o.i===k).length;
+  return {grade(final){if(final)seqBox.querySelectorAll('.chip').forEach((c,k)=>c.classList.add(seq[k].i===k?'good':'bad'));return right()===all.length?1:0},
+   retry(){},isReady:()=>pool.length===0,hint:()=>`${right()} of ${all.length} are in the right place.`,answer:()=>el('ol',{},t.items.map(x=>el('li',{},x)))};
+ },
+ sort(t,ui){
+  const items=shuffle(t.items.map((x,i)=>({x:x[0],c:x[1],i}))),pick={};const rows=[];
+  items.forEach(it=>{const seg=el('div',{class:'seg',role:'group','aria-label':it.x});
+   const bs=t.cats.map((c,ci)=>el('button',{type:'button','aria-pressed':'false',onclick:()=>{if(ui.locked)return;pick[it.i]=ci;bs.forEach((b,bi)=>{b.classList.toggle('on',bi===ci);b.setAttribute('aria-pressed',bi===ci)});ui.ready(Object.keys(pick).length===items.length)}},c));
+   seg.append(...bs);const row=el('div',{class:'sortrow'},el('span',{style:'font-weight:500'},it.x),seg);row._it=it;row._bs=bs;rows.push(row)});
+  ui.body.append(el('div',{},rows));
+  const right=()=>rows.filter(r=>pick[r._it.i]===r._it.c).length;
+  return {grade(final){if(final)rows.forEach(r=>{const ok=pick[r._it.i]===r._it.c;r._bs[pick[r._it.i]].classList.add(ok?'good':'bad');if(!ok)r._bs[r._it.c].classList.add('good')});return right()/rows.length},
+   retry(){},isReady:()=>Object.keys(pick).length===items.length,hint:()=>`${right()} of ${rows.length} are sorted correctly.`,
+   answer:()=>el('ul',{},t.cats.map((c,ci)=>el('li',{},el('b',{},c+': '),t.items.filter(x=>x[1]===ci).map(x=>x[0]).join(', '))))};
+ },
+ tt(t,ui){
+  const n=t.vars.length,rows=1<<n,val=Array(rows).fill(null),bs=[];const body=[];
+  for(let r=0;r<rows;r++){const bits=t.vars.map((_,k)=>(r>>(n-1-k))&1);
+   const b=el('button',{type:'button','aria-label':`Output for ${t.vars.map((v,k)=>v+'='+bits[k]).join(', ')}`,onclick:()=>{if(ui.locked)return;val[r]=val[r]===1?0:1;b.textContent=val[r];ui.ready(val.every(v=>v!==null))}},'?');bs.push(b);
+   body.push(el('tr',{},bits.map(x=>el('td',{},x)),el('td',{},b)))}
+  ui.body.append(el('p',{class:'expr'},t.expr),el('p',{class:'how'},'Tap each output cell to set it to 0 or 1.'),
+   el('div',{class:'ttwrap'},el('table',{class:'tt'},el('tr',{},t.vars.map(v=>el('th',{},v)),el('th',{},'Q')),body)));
+  const right=()=>val.filter((v,r)=>v===t.out[r]).length;
+  return {grade(final){if(final)bs.forEach((b,r)=>b.classList.add(val[r]===t.out[r]?'good':'bad'));return right()/rows},
+   retry(){},isReady:()=>val.every(v=>v!==null),hint:()=>`${right()} of ${rows} outputs are right.`,answer:()=>el('p',{class:'ans'},'Q column, top to bottom: '+t.out.join(' '))};
+ },
+ sql(t,ui){
+  let pool=shuffle([...t.tokens,...(t.extra||[])].map((x,i)=>({x,i}))),seq=[];
+  const seqBox=el('div',{class:'seq inline','data-empty':'Tap the pieces below to build the statement'}),poolBox=el('div',{class:'pool inline'});
+  function paint(){seqBox.replaceChildren(...seq.map((o,k)=>el('button',{class:'tok',type:'button',onclick:()=>{if(ui.locked)return;seq.splice(k,1);pool.push(o);paint()}},o.x)));
+   poolBox.replaceChildren(...pool.map((o,k)=>el('button',{class:'tok',type:'button',onclick:()=>{if(ui.locked)return;pool.splice(k,1);seq.push(o);paint()}},o.x)));
+   ui.ready(seq.length>0)}
+  paint();
+  ui.body.append(el('p',{class:'how'},'Tap pieces in order. Not every piece is needed. Tap a placed piece to remove it.'),seqBox,poolBox);
+  const canon=a=>{a=a.slice();for(let k=0;k+3<a.length;k++)if(a[k]==='ON'&&a[k+2]==='='&&a[k+1]>a[k+3]){const x=a[k+1];a[k+1]=a[k+3];a[k+3]=x}return a.join(' ')};
+  const ok=()=>{const s=canon(seq.map(o=>o.x));return [t.tokens,...(t.alt||[])].some(a=>canon(a)===s)};
+  return {grade(final){const r=ok();if(final)seqBox.classList.add(r?'good':'bad');return r?1:0},retry(){},isReady:()=>seq.length>0,
+   hint:()=>'The statement is not right yet. Check the order and any extra pieces.',answer:()=>el('p',{class:'ans'},t.tokens.join(' ').replace(/ ;$/,';').replace(/ ,/g,',').replace(/\( /g,'(').replace(/ \)/g,')'))};
+ },
+ type(t,ui){
+  const inp=el('input',{type:'text',id:'ans-'+Math.random().toString(36).slice(2,8),class:(t.mono||t.sql)?'mono':'',placeholder:t.ph||'Your answer',autocomplete:'off',autocapitalize:'off',spellcheck:'false'});
+  inp.addEventListener('input',()=>ui.ready(inp.value.trim().length>0));
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim()&&!ui.locked){e.preventDefault();ui.body.closest('.panel').querySelector('.btn:not([hidden])')?.click()}});
+  ui.body.append(inp,t.sql?el('p',{class:'how'},'Spaces, capital letters, quotes and the final ; do not matter.'):null);setTimeout(()=>inp.focus(),0);
+  /* lenient: ignore case, spaces, dots, commas, quotes, brackets, ; : - _ ; numbers 4.00 = 4 ; leading zeros / 0x in number answers */
+  const norm=s=>{s=String(s).toLowerCase().replace(/(\d)\.0+(?!\d)/g,'$1').replace(/[\s.,;:'"`’‘“”()\[\]\-_!?]/g,'');if(t.num)s=s.replace(/^0x/,'').replace(/^0+(?=.)/,'');return s};
+  const ok=()=>t.a.map(norm).includes(norm(inp.value));
+  return {grade(final){const r=ok();if(final){inp.readOnly=true;inp.classList.add(r?'good':'bad')}return r?1:0},
+   retry(){inp.select()},isReady:()=>inp.value.trim().length>0,hint:()=>'That answer is not right.',answer:()=>el('p',{class:'ans'},t.show||t.a[0])};
+ }
+};
+go(start);
+</script>
+</body></html>
