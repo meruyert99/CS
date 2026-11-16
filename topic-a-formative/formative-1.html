@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><title>Signal Quest 1</title>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style></head><body><script src="config.js"></script><title>Signal Quest 1</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -125,6 +125,7 @@ details.refbox summary{cursor:pointer;font-weight:600}
 .rank{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--bg);font:600 14px var(--mono)}
 .rank.t1,.rank.t2,.rank.t3{background:var(--accent);color:var(--on-accent)}
 .pill{display:inline-block;font:500 12px var(--mono);padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.lvl{color:var(--ink);background:var(--accent);border-color:var(--shadow)}
 .pill.done{border-color:var(--good);color:var(--good)}
 .lbwrap{overflow-x:auto}
 .big{font-family:var(--display);font-size:clamp(56px,14vw,96px);font-weight:700;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
@@ -280,10 +281,22 @@ function drawTrack(){
 const LB={db:null,uid:null,owner:false,canWrite:true,rows:[],state:'off',q:Promise.resolve()};
 function lbBody(){return {name:S.name,mark:mark(),correct:correct(),firstTry:S.res.filter(r=>r.ok&&r.a===1).length,done:S.res.length,total:N,finished:S.res.length>=N,
  timeMs:S.started?((S.finished||Date.now())-S.started):0,attempt:S.attempt||1,updatedAt:new Date().toISOString()}}
-function pushResult(){if(!LB.db||!LB.uid||!LB.canWrite||!S.name)return;const body=lbBody();
+/* outside Claude (e.g. GitHub Pages) the same board can use a Google Sheet web app: window.SHEET_URL */
+const SHEET_URL=(typeof window.SHEET_URL==='string')?window.SHEET_URL:'';
+function pushResult(){if(!S.name)return;
+ if(LB.mode==='sheet'){const body=Object.assign(lbBody(),{formative:Q.id,id:LB.uid,level:Q.stations[stationAt(correct()/N)]});
+  LB.q=LB.q.then(()=>fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)})).then(()=>setTimeout(()=>LB.reload&&LB.reload(),2500)).catch(()=>{});return}
+ if(!LB.db||!LB.uid||!LB.canWrite)return;const body=lbBody();
  LB.q=LB.q.then(()=>LB.db.doc('results/'+LB.uid).set(body)).catch(e=>{if(e&&e.code==='invalid_argument')LB.canWrite=false});}
-(async()=>{try{const c=window.claude;if(!c||!c.use)return;
- const [db,user]=await Promise.all([c.use('db'),c.use('user')]);if(!db)return;LB.db=db;
+function initSheet(){LB.mode='sheet';if(!S.cid){S.cid='s_'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);save()}LB.uid=S.cid;
+ const btn=document.getElementById('lbBtn');if(btn)btn.hidden=false;
+ LB.state='loading';paintBoards();
+ LB.reload=()=>fetch(SHEET_URL+(SHEET_URL.includes('?')?'&':'?')+'formative='+encodeURIComponent(Q.id)+'&t='+Date.now()).then(r=>r.json()).then(j=>{LB.rows=Array.isArray(j.rows)?j.rows:[];LB.state='ok';paintBoards()}).catch(()=>{if(LB.state!=='ok'){LB.state='error';paintBoards()}});
+ LB.reload();setInterval(()=>{if(!document.hidden)LB.reload()},20000);
+ if(S.started)pushResult();}
+(async()=>{try{const c=window.claude;
+ const [db,user]=(c&&c.use)?await Promise.all([c.use('db'),c.use('user')]):[null,null];
+ if(!db){if(SHEET_URL)initSheet();return}LB.db=db;
  if(user){LB.uid=await user.id();LB.owner=await user.isOwner().catch(()=>false);if(await user.can('data.write').catch(()=>null)===false)LB.canWrite=false}
  LB.state='loading';paintBoards();const timer=setTimeout(()=>{if(LB.state==='loading'){LB.state='slow';paintBoards()}},10000);
  db.collection('results').onSnapshot(snap=>{if(!snap.metadata.fromCache)clearTimeout(timer);LB.rows=snap.docs.map(d=>Object.assign({id:d.id},d.data()));LB.state='ok';paintBoards()},
@@ -299,10 +312,11 @@ function boardEl(){const box=el('div',{class:'lbbox'});box._paint=()=>{
  else{const rows=sortedRows();
   if(!rows.length)body=el('p',{class:'muted'},LB.state==='slow'?'The leaderboard cannot be reached yet.':'No results yet. Names appear here as soon as students start.');
   else body=el('div',{class:'lbwrap'},el('table',{class:'lbtable'},
-   el('tr',{},el('th',{},'#'),el('th',{},'Name'),el('th',{style:'text-align:right'},'Mark'),el('th',{},'Progress'),el('th',{style:'text-align:right'},'Time'),LB.owner?el('th',{},''):null),
+   el('tr',{},el('th',{},'#'),el('th',{},'Name'),el('th',{},'Level'),el('th',{style:'text-align:right'},'Mark'),el('th',{},'Progress'),el('th',{style:'text-align:right'},'Time'),LB.owner?el('th',{},''):null),
    rows.map((r,i)=>{const me=r.id===LB.uid;const delCell=LB.owner?el('td',{},delBtn(r)):null;
     return el('tr',{class:me?'me':''},el('td',{},el('span',{class:'rank t'+(i+1)},i+1)),
      el('td',{},r.name,me?el('span',{class:'muted'},' (you)'):null,(r.attempt||1)>1?el('span',{class:'pill',style:'margin-left:8px'},'attempt '+r.attempt):null),
+     el('td',{},el('span',{class:'pill lvl'},Q.stations[stationAt((r.correct||0)/(r.total||N))])),
      el('td',{class:'r'},Number(r.mark||0).toFixed(1)),
      el('td',{},r.finished?el('span',{class:'pill done'},'finished'):el('span',{class:'pill'},(r.done||0)+'/'+(r.total||N))),
      el('td',{class:'r'},fmt(r.timeMs||0)),delCell)})));
@@ -409,12 +423,13 @@ function results(){
   missed.length?el('section',{class:'panel'},el('h3',{},'Look at these again'),
    el('details',{class:'miss'},el('summary',{},`${missed.length} tasks without full marks`),
     el('ul',{},missed.map(x=>el('li',{},el('b',{},x.t.c+' '),x.t.q,el('br'),el('span',{class:'muted'},x.t.e)))))):null,
+  (window.claude||SHEET_URL)?el('section',{class:'panel'},el('h3',{},'High scores'),boardEl()):'',
   resetBox());
 }
 function resetBox(){
  const box=el('div',{class:'row',style:'justify-content:flex-end'});
  box.append(el('button',{class:'btn ghost small',type:'button',onclick:()=>{box.replaceChildren(el('span',{class:'muted'},'Erase this attempt?'),
-  el('button',{class:'btn small',type:'button',onclick:()=>{const a=(S.attempt||1)+1;S=fresh();S.attempt=a;lastPos=null;save();go(start)}},'Yes, start over'),
+  el('button',{class:'btn small',type:'button',onclick:()=>{const a=(S.attempt||1)+1,cid=S.cid;S=fresh();S.attempt=a;if(cid)S.cid=cid;lastPos=null;save();go(start)}},'Yes, start over'),
   el('button',{class:'btn ghost small',type:'button',onclick:()=>go(results)},'Cancel'))}},'Start over'));
  return box;
 }
